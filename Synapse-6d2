@@ -1,0 +1,27 @@
+import streamlit as st
+import time
+
+# ตั้งค่าหน้าแอป
+st.set_page_config(page_title="SYNAPSE 6D", page_icon="💎")
+
+st.title("💎 SYNAPSE : 6D Emotional Sync")
+st.write("ระบบบำบัดระดับเซลล์ (Prototype v2.0)")
+
+# ส่วนรับอารมณ์
+mood_text = st.text_input("ระบายความรู้สึกของคุณออกมาได้เลย", "")
+
+if st.button("ACTIVATE 6D SYNC"):
+    if mood_text:
+        with st.status("กำลังเชื่อมต่อระบบประสาท...", expanded=True):
+            st.write("🧬 ปรับค่า RBF Matrix...")
+            time.sleep(2)
+        
+        st.subheader("🔊 6D Audio Activated")
+        # เสียงร้องบำบัดตัวอย่าง
+        audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        st.audio(audio_url, format="audio/mp3", autostart=True)
+        
+        st.image("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJndnB3Znd4ZzR4ZzR4ZzR4ZzR4ZzR4ZzR4ZzR4ZzR4ZzR4ZzR4JmVwPXYxX2ludGVybmFsX2dpZl9ieV9iZAmVfYmdfY3VzdG9tJmN0PWc/3o7TKMGpx6v2ca9Hl6/giphy.gif")
+        st.success(f"ระบบจูนความรู้สึก '{mood_text}' ให้สมดุลแล้ว")
+    else:
+        st.warning("กรุณาพิมพ์ความรู้สึกก่อนครับ")
