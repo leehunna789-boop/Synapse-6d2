@@ -1,4 +1,7 @@
 numpy
 streamlit
 google-generativeai
+pandas
 scipy
+geocoder
+requests
