@@ -3,71 +3,78 @@ import numpy as np
 import time
 import os
 
-# --- 1. ตั้งค่าหน้าจอและสไตล์ (Perfect UI) ---
+# --- 1. การตั้งค่าหน้าจอและสไตล์พรีเมียม ---
 st.set_page_config(page_title="SYNAPSE 6D ENERGY PRO", page_icon="💎", layout="centered")
 
+# ปรับแต่งธีมแอปให้ดูหรูหราและสมจริง
 st.markdown("""
     <style>
-    .stApp { background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: white; }
-    .stButton>button { background: linear-gradient(45deg, #FF4B2B, #FF416C); color: white; border-radius: 20px; font-weight: bold; width: 100%; height: 3.5em; }
+    .stApp { background: linear-gradient(135deg, #020111 0%, #050531 50%, #020111 100%); color: #e0e0e0; }
+    .stButton>button { 
+        background: linear-gradient(90deg, #ff0000, #ff416c); color: white; 
+        border-radius: 30px; border: none; width: 100%; height: 4em; font-weight: bold; font-size: 20px;
+        box-shadow: 0 4px 15px rgba(255, 65, 108, 0.4);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. ระบบคำนวณพลังงาน (จากโค้ดที่คุณส่งมา) ---
-MATRIX_V1 = {"JOY": {"F0": 0.8, "Vibrato": 0.9}, "SAD": {"F0": 0.3, "Vibrato": 0.2}}
-MATRIX_V2 = {"JOY": {"SAT": 0.9, "LIGHT": 0.8, "CONTRAST": 0.8}, "SAD": {"SAT": 0.2, "LIGHT": 0.3, "CONTRAST": 0.4}}
-
-def lerp(low, high, factor): return low + (high - low) * factor
-
-def synthesize_music_pro(v):
-    f0 = lerp(MATRIX_V1["SAD"]["F0"], MATRIX_V1["JOY"]["F0"], v)
-    vibrato = lerp(MATRIX_V1["SAD"]["Vibrato"], MATRIX_V1["JOY"]["Vibrato"], v)
-    t = np.linspace(0, 5, 44100 * 5)
-    wave = 0.5 * np.sin(2 * np.pi * (440 * f0) * t + (vibrato * np.sin(2 * np.pi * 5 * t)))
-    envelope = np.ones_like(t)
-    fade_len = 44100 // 2
-    envelope[:fade_len] = np.linspace(0, 1, fade_len)
-    envelope[-fade_len:] = np.linspace(1, 0, fade_len)
-    audio = (wave * envelope * 32767).astype(np.int16)
-    return audio
+# --- 2. ระบบเลือกดนตรีสมจริง (Sound Engine) ---
+def get_therapy(user_text):
+    text = user_text.lower()
+    if any(word in text for word in ['เหนื่อย', 'เครียด', 'เศร้า']):
+        return {
+            "title": "Deep Healing Piano (เสียงเปียโนสมจริง)",
+            "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+            "video": "https://www.youtube.com/watch?v=668nUCeB4bw"
+        }
+    else:
+        return {
+            "title": "Nature Energy (เสียงธรรมชาติสมจริง)",
+            "audio": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3",
+            "video": "https://www.youtube.com/watch?v=nMfPqeZjc2c"
+        }
 
 # --- 3. แสดงผลโลโก้และสโลแกน ---
-logo_file = "logo.jpg" 
-if os.path.exists(logo_file):
-    st.image(logo_file, use_container_width=True) # แสดงโลโก้ที่อัปโหลดไว้
+logo_path = "logo.jpg"
+if os.path.exists(logo_path):
+    st.image(logo_path, use_container_width=True)
 
-st.markdown("<h3 style='text-align: center;'>\"อยู่นิ่งๆ ไม่เจ็บตัว\"</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #ff4b2b;'>\"อยู่นิ่งๆ ไม่เจ็บตัว\"</h3>", unsafe_allow_html=True)
 
-# --- 4. ส่วนการใช้งาน ---
+# --- 4. ฟังก์ชันพิเศษ: Zen Energy Charge ---
 st.write("---")
-user_input = st.text_area("วันนี้คุณรู้สึกอย่างไร?", placeholder="เช่น วันนี้เหนื่อยจังแต่ก็ยังยิ้มได้")
+if st.toggle("🧘‍♂️ เปิดระบบชาร์จพลังความนิ่ง"):
+    st.info("กรุณานิ่ง... ระบบกำลังซิงค์พลังงาน 6D")
+    bar = st.progress(0)
+    for p in range(101):
+        time.sleep(0.03)
+        bar.progress(p)
+    st.success("✨ ชาร์จพลังงานสำเร็จ! 'อยู่นิ่งๆ ไม่เจ็บตัว' ของจริง")
 
-if st.button("🚀 เริ่มการบำบัด (Fully Automated)"):
-    if user_input:
-        with st.spinner("ระบบกำลังคำนวณ Matrix และซิงค์พลังงาน..."):
-            # จำลองการวิเคราะห์จากระบบ AI
+# --- 5. ระบบบำบัดด้วยเสียงและภาพสมจริง ---
+st.write("---")
+user_feeling = st.text_area("สภาวะจิตใจของคุณ:", placeholder="ระบุความรู้สึกที่นี่...")
+
+if st.button("🔥 ACTIVATE 6D REALISTIC THERAPY"):
+    if user_feeling:
+        therapy = get_therapy(user_feeling)
+        with st.status("⚡ กำลังเตรียมกระบวนการบำบัดสมจริง...", expanded=True):
             time.sleep(1.5)
-            mood_value = 0.75 # ค่าจำลองความสุข
-            
-            # สร้างเสียงบำบัดจริงจากคณิตศาสตร์
-            audio_data = synthesize_music_pro(mood_value)
-            
-            # คำนวณค่า Visual (SAT, LIGHT, CONTRAST)
-            sat = lerp(MATRIX_V2["SAD"]["SAT"], MATRIX_V2["JOY"]["SAT"], mood_value)
-            light = lerp(MATRIX_V2["SAD"]["LIGHT"], MATRIX_V2["JOY"]["LIGHT"], mood_value)
-            
-            st.balloons()
-            st.subheader(f"🔊 พลังงานบำบัดที่ส่งให้คุณ (Intensity: {mood_value})")
-            st.audio(audio_data, format='audio/wav', sample_rate=44100)
-            
-            c1, c2 = st.columns(2)
-            c1.metric("ความสว่างพลังงาน", f"{light:.2f}")
-            c2.metric("ความอิ่มสีของออร่า", f"{sat:.2f}")
-            
-            st.success(f"สโลแกนของคุณ: 'อยู่นิ่งๆ ไม่เจ็บตัว' - ระบบบำบัดให้เรียบร้อยครับ")
+            st.write(f"🎵 จูนเสียงดนตรี: {therapy['title']}")
+            time.sleep(1)
+        
+        st.balloons()
+        st.subheader(f"🔊 กำลังเล่น: {therapy['title']}")
+        st.audio(therapy['audio']) # เสียงดนตรีจริง
+        
+        st.write("---")
+        st.subheader("📺 Visual Therapy (4K)")
+        st.video(therapy['video']) # วิดีโอวิวธรรมชาติสมจริง
+        
+        st.success(f"ระบบบำบัดสำหรับ '{user_feeling}' พร้อมแล้ว... นิ่งเข้าไว้นะครับ")
     else:
-        st.warning("กรุณาพิมพ์ข้อความเพื่อวิเคราะห์พลังงาน")
+        st.warning("กรุณาระบุความรู้สึกก่อน")
 
-# --- 5. ส่วนท้าย ---
+# --- 6. ส่วนท้าย ---
 st.markdown("---")
 st.caption("🔵🔴⚪ SYNAPSE 6D HIGH-PERFORMANCE SYSTEM")
