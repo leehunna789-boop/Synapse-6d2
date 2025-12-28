@@ -1,72 +1,80 @@
 import streamlit as st
+import google.generativeai as genai
+import time
 
-# --- การตกแต่งสี Red-Blue-Green & White Text ---
+# --- การตั้งค่าหน้าจอ ---
+st.set_page_config(page_title="SYNAPSE 6D ENERGY PRO", page_icon="💎", layout="centered")
+
+# --- ชุดคำสั่งตกแต่งดีไซน์ (CSS) โทน น้ำเงิน-แดง-ขาว ---
 st.markdown("""
     <style>
-    /* 1. พื้นหลังหลัก: น้ำเงินเข้มไล่เฉดไปดำ (Blue to Black) */
     .stApp {
-        background: linear-gradient(180deg, #000044 0%, #000000 100%) !important;
+        background: linear-gradient(135deg, #001f3f 0%, #4d0000 100%);
+        color: #ffffff;
     }
-    
-    /* 2. ตัวหนังสือทุกจุด: สีขาวบริสุทธิ์ (White) */
-    h1, h2, h3, p, span, label, div, .stMarkdown {
-        color: #FFFFFF !important;
-        text-shadow: 2px 2px 4px #000000;
+    .title-text {
+        text-align: center;
+        font-size: 55px;
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow: 3px 3px 0px #ff0000, -3px -3px 0px #0000ff;
+        margin-bottom: 5px;
     }
-
-    /* 3. ช่องกรอกข้อมูล: พื้นหลังดำ ขอบเขียวมินต์ ตัวหนังสือขาว */
-    .stTextArea textarea, .stTextInput input {
-        background-color: #000000 !important;
-        color: #FFFFFF !important;
-        border: 2px solid #00FFCC !important;
-        border-radius: 10px;
-    }
-    
-    /* 4. ปุ่ม ACTIVATE: สีแดง (Red) ตัวหนังสือขาว */
-    .stButton>button {
-        background-color: #FF0000 !important;
-        color: #FFFFFF !important;
-        border: 2px solid #FFFFFF !important;
-        border-radius: 15px;
-        height: 60px;
-        width: 100%;
-        font-size: 24px !important;
+    .slogan {
+        text-align: center;
+        font-size: 20px;
         font-weight: bold;
-        box-shadow: 0px 0px 20px rgba(255, 0, 0, 0.5);
-        transition: 0.5s;
-    }
-
-    /* 5. เอฟเฟกต์เมื่อวางเมาส์ที่ปุ่ม: เรืองแสงสีเขียว */
-    .stButton>button:hover {
-        background-color: #00FF00 !important;
-        color: #000000 !important;
-        box-shadow: 0px 0px 25px rgba(0, 255, 0, 0.8);
-    }
-
-    /* 6. แถบสถานะ Metric: พื้นหลังน้ำเงิน ขอบขาว */
-    div[data-testid="metric-container"] {
-        background-color: rgba(0, 0, 100, 0.5) !important;
-        border: 1px solid #FFFFFF !important;
-        border-radius: 10px;
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.1);
         padding: 10px;
+        border-radius: 10px;
+        border: 2px solid #ffffff;
     }
-    [data-testid="stMetricValue"] {
-        color: #FFFFFF !important;
+    .stTextInput > div > div > input {
+        background-color: #ffffff;
+        color: #000000;
+        border: 3px solid #ff0000;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+    .stButton > button {
+        background: linear-gradient(90deg, #ff0000, #ffffff, #0000ff);
+        color: #000000;
+        border-radius: 5px;
+        font-weight: 900;
+        font-size: 20px;
+        width: 100%;
+        border: 2px solid #000000;
+        height: 3em;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ส่วนแสดงผลหลัก ---
-try:
-    st.image("1000008780.jpg", use_container_width=True)
-except:
-    st.title("💎 SYNAPSE 6D ENERGY PRO")
+# --- ส่วนหัวแอป ---
+st.markdown('<p class="title-text">💎 SYNAPSE 6D ENERGY PRO</p>', unsafe_allow_html=True)
+st.markdown('<p class="slogan">"อยู่นิ่งๆ ไม่เจ็บตัว"</p>', unsafe_allow_html=True)
 
-st.subheader("อยู่นิ่งๆ ไม่เจ็บตัว")
+# --- ส่วนรับข้อมูล ---
+user_input = st.text_input("ระบุข้อความเพื่อรับพลังงาน 6D...")
 
-# ช่องรับข้อมูลที่ตอนนี้ขอบจะเป็นสีเขียว ตัวหนังสือขาว
-mood = st.text_input("ระบุสภาวะจิตใจของคุณ:", placeholder="เบื่อเซ่ง / ต้องการพลัง...")
+if st.button("🔥 ACTIVATE ENERGY"):
+    if user_input:
+        with st.spinner('⚡ กำลังดึงพลังงาน น้ำเงิน-แดง-ขาว...'):
+            try:
+                # ระบบ AI (ใช้ Key เดิมของพี่)
+                genai.configure(api_key="AIzaSyA-xxxxxx") 
+                model = genai.GenerativeModel('gemini-pro')
+                
+                prompt = f"ตอบคำถามนี้ในฐานะ SYNAPSE 6D ENERGY PRO ด้วยสไตล์ 'อยู่นิ่งๆ ไม่เจ็บตัว': {user_input}"
+                response = model.generate_content(prompt)
+                
+                st.balloons() # เพิ่มเอฟเฟกต์ลูกโป่งตอนทำเสร็จ
+                st.markdown("### ⚪ ผลลัพธ์พลังงาน:")
+                st.info(response.text)
+            except:
+                st.error("ระบบขัดข้อง โปรดลองใหม่")
+    else:
+        st.warning("กรุณาใส่ข้อมูลก่อนครับ!")
 
-if st.button("🚀 ACTIVATE ENERGY"):
-    st.write("ระบบกำลังจูนคลื่นความถี่น้ำเงิน-แดง-เขียวให้คุณ...")
-    # โค้ดประมวลผลเสียง R&B ของคุณจะทำงานต่อตรงนี้
+st.markdown("---")
+st.caption("🔵🔴⚪ SYNAPSE 6D HIGH-PERFORMANCE SYSTEM")
