@@ -1,5 +1,4 @@
-
-import numpy as np
+Import numpy as np
 import streamlit as st
 import google.generativeai as genai
 import json, io, os, time, requests
