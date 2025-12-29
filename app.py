@@ -1,73 +1,116 @@
+import numpy as np
 import streamlit as st
+from scipy.io import wavfile
+import io
 import google.generativeai as genai
-import requests
 
-# --- 1. LUXURY DESIGN (สะท้อนแสงทุกส่วน) ---
-st.set_page_config(page_title="SYNAPSE 6D Pro", layout="wide")
-
-st.markdown("""
-    <style>
-    .stApp { background-color: #050505; color: #ffffff; }
-    .glow-card {
-        border: 2px solid #00FFCC; border-radius: 15px;
-        padding: 20px; box-shadow: 0 0 20px #00FFCC;
-        background: rgba(10, 10, 10, 0.9);
-    }
-    .neon-title {
-        text-shadow: 0 0 10px #B266FF, 0 0 20px #00f2fe;
-        color: white; font-size: 50px; text-align: center;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 2. API CONNECTIVITY (เชื่อมต่อของจริง) ---
+# --- การตั้งค่า API และโมเดล ---
 try:
-    # ดึง Key จาก Secrets
-    GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
-    WEATHER_KEY = st.secrets["ACCUWEATHER_API_KEY"]
-    UNSPLASH_KEY = st.secrets["UNSPLASH_ACCESS_KEY"]
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-pro')
+except:
+    st.error("กรุณาตรวจสอบการตั้งค่า GEMINI_API_KEY ใน Secrets")
 
-    # ตั้งค่า Gemini (ใช้รุ่น -latest เพื่อแก้ Error 404)
-    genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
-except Exception as e:
-    st.error(f"⚠️ ตรวจพบข้อผิดพลาดในการเชื่อมต่อ API: {e}")
+# -----------------------------------------------------------
+# 1. INPUT MODULE (เชื่อมต่อ AI เพื่อวิเคราะห์ดนตรี)
+# -----------------------------------------------------------
+class InputModule:
+    ROOT_VOCAB = {"C": 261.63, "C#": 277.18, "D": 293.66, "D#": 311.13, "E": 329.63, "F": 349.23, 
+                  "F#": 369.99, "G": 392.00, "G#": 415.30, "A": 440.00, "A#": 466.16, "B": 493.88} 
 
-# --- 3. INTERFACE (Desktop Mode) ---
-st.markdown('<div class="neon-title">💎 SYNAPSE 6D Pro</div>', unsafe_allow_html=True)
-st.sidebar.image("logo.jpg", use_container_width=True) # โลโก้รูปโลกของคุณ
+    def ให้_AI_วิเคราะห์_Rhythm(self, chords, valence, arousal):
+        """ใช้ Gemini API ช่วยกำหนดความเร็วและสไตล์เพลง"""
+        prompt = f"วิเคราะห์คอร์ด {chords} อารมณ์ (Valence={valence}, Arousal={arousal}) แนะนำความเร็วเพลง (BPM) และสไตล์สั้นๆ"
+        try:
+            response = model.generate_content(prompt)
+            return response.text
+        except:
+            return "ไม่สามารถเชื่อมต่อ AI ได้ (ใช้ค่ามาตรฐาน)"
 
-col1, col2 = st.columns([1.3, 0.7])
+    def จัด_โครงสร้าง_คำสั่ง(self, คำสั่งคอร์ด, valence, arousal):
+        chords = [c.strip().split()[0].upper() for c in คำสั่งคอร์ด.split(',') if c.strip()]
+        chord_freqs = [self.ROOT_VOCAB.get(c, 261.63) for c in chords]
+        
+        # Symbolic Sequence: [Frequency, Valence, Arousal]
+        return np.array([[f, valence, arousal] for f in chord_freqs])
+
+# -----------------------------------------------------------
+# 2. AI SYNTHESIS ENGINE (สร้างเสียงตามคุณลักษณะ RBF)
+# -----------------------------------------------------------
+class AISynthesisEngine:
+    def __init__(self, samplerate=44100):
+        self.sampling_rate = samplerate
+
+    def สังเคราะห์_เสียง(self, symbolic_sequence):
+        final_audio = np.array([], dtype=np.float32)
+        
+        for row in symbolic_sequence:
+            freq, valence, arousal = row
+            # ปรับความยาวโน้ตตาม Arousal (ยิ่งสูงยิ่งสั้น/กระชับ)
+            duration = 0.8 - (arousal * 0.4) 
+            t = np.linspace(0, duration, int(self.sampling_rate * duration), endpoint=False)
+            
+            # สร้างเสียง Synth พื้นฐาน
+            amplitude = 0.2 + (arousal * 0.5)
+            # ผสมคลื่น Sine และ Square เล็กน้อยเพื่อให้มี Harmonic (ถ้า Valence สูงจะนุ่มนวล)
+            wave = (1-valence)*0.5 * np.sin(2 * np.pi * freq * t) + (valence)*0.5 * np.cos(2 * np.pi * freq * t)
+            
+            # ใส่ ADSR Envelope เบื้องต้น (Fade in/out)
+            fade = int(self.sampling_rate * 0.05)
+            envelope = np.ones_like(wave)
+            envelope[:fade] = np.linspace(0, 1, fade)
+            envelope[-fade:] = np.linspace(1, 0, fade)
+            
+            final_audio = np.concatenate([final_audio, wave * amplitude * envelope])
+            
+        return final_audio
+
+# -----------------------------------------------------------
+# 3. STREAMLIT UI
+# -----------------------------------------------------------
+st.set_page_config(layout="wide", page_title="RBF AI Synthesizer")
+st.title("🎼 RBF AI Music Engine (API Connected)")
+
+# Sidebar สำหรับ Logs
+st.sidebar.header("⚙️ System Status")
+
+# --- UI Layout ---
+col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.markdown('<div class="glow-card">', unsafe_allow_html=True)
-    st.subheader("📋 กระดานขยี้ใจความ (Lyrics Master)")
-    user_input = st.text_area("วันนี้คุณรู้สึกอย่างไร?", placeholder="เบื่อคำโกหก / พักผ่อนสายฝน...")
+    st.subheader("🎹 Input Parameters")
+    chords = st.text_input("คอร์ด (เช่น C, Am, F, G)", "C, Am, F, G")
+    v = st.slider("ความสุข (Valence)", 0.0, 1.0, 0.7)
+    a = st.slider("พลังงาน (Arousal)", 0.0, 1.0, 0.5)
     
-    if st.button("🚀 ACTIVATE ENERGY (เริ่มการบำบัด)"):
-        if user_input:
-            with st.spinner("🧠 AI กำลังดึงความจำไม่รู้ลืมและประมวลผลเสียงร้อง..."):
-                try:
-                    # AI เจนเนื้อเพลง
-                    response = model.generate_content(f"แต่งเพลงแนวบำบัดจากใจความ: {user_input}")
-                    st.session_state.lyrics = response.text
-                    st.success("ประมวลผลความฉลาดไร้ขีดจำกัดเรียบร้อย")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if 'lyrics' in st.session_state:
-        st.code(st.session_state.lyrics, language="markdown")
+    btn = st.button("🚀 สังเคราะห์เพลง", type="primary")
 
 with col2:
-    st.markdown('<div class="glow-card" style="border-color:#FF3131;">', unsafe_allow_html=True)
-    st.subheader("🩺 Real-time Biometrics")
-    st.metric("ชีพจร (BPM)", "76", delta="Steady Pulse")
-    st.write("🌍 **GPS:** Bangkok, TH (Active)")
-    st.markdown('</div>', unsafe_allow_html=True)
+    if btn:
+        system = InputModule()
+        engine = AISynthesisEngine()
+        
+        with st.spinner("AI กำลังวิเคราะห์ดนตรี..."):
+            # เรียกใช้ API
+            ai_advice = system.ให้_AI_วิเคราะห์_Rhythm(chords, v, a)
+            st.info(f"🤖 **AI Advice:** {ai_advice}")
+            
+            # ประมวลผลเสียง
+            sym_seq = system.จัด_โครงสร้าง_คำสั่ง(chords, v, a)
+            raw_audio = engine.สังเคราะห์_เสียง(sym_seq)
+            
+            st.subheader("🎵 Result")
+            st.line_chart(raw_audio[:5000]) # แสดง Waveform
+            st.audio(raw_audio, sample_rate=44100)
+            
+            # ปุ่มดาวน์โหลด
+            buffer = io.BytesIO()
+            wavfile.write(buffer, 44100, (raw_audio * 32767).astype(np.int16))
+            st.download_button("⬇️ Download WAV", buffer, "rbf_music.wav")
+            
+            st.sidebar.success("การสังเคราะห์เสร็จสมบูรณ์!")
+    else:
+        st.write("รอรับคำสั่งจากคุณอยู่ครับ...")
 
-    # ฟังก์ชันแสดงภาพจาก Unsplash
-    st.markdown('<div class="glow-card" style="border-color:#00f2fe;">', unsafe_allow_html=True)
-    st.subheader("🌤️ Weather & Visuals")
-    st.write("ดึงข้อมูลสภาพอากาศจริงจาก AccuWeather เรียบร้อย")
-    st.markdown('</div>', unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.write("สโลแกน: **อยู่นิ่งๆ ไม่เจ็บตัว**")
