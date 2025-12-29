@@ -1,73 +1,133 @@
 import streamlit as st
+import numpy as np
+import librosa
+import os
 import google.generativeai as genai
-import requests
 
-# --- 1. LUXURY DESIGN (สะท้อนแสงทุกส่วน) ---
-st.set_page_config(page_title="SYNAPSE 6D Pro", layout="wide")
+# --- 1. การตั้งค่าหน้าจอและดีไซน์ (OLED / 60-30-10 Rule) ---
+st.set_page_config(page_title="SYNAPSE 6D PRO", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #050505; color: #ffffff; }
-    .glow-card {
-        border: 2px solid #00FFCC; border-radius: 15px;
-        padding: 20px; box-shadow: 0 0 20px #00FFCC;
-        background: rgba(10, 10, 10, 0.9);
+    /* พื้นหลังดำสนิทเพื่อสีที่คมชัดแบบ OLED */
+    .stApp { background-color: #000000; font-family: 'Kanit', sans-serif; }
+    
+    .neon-red-logo { 
+        color: #FF0000; 
+        text-shadow: 0 0 25px #FF0000, 0 0 45px rgba(255,0,0,0.6); 
+        font-size: 70px; 
+        text-align: center; 
+        font-weight: 900; 
+        letter-spacing: 5px;
     }
-    .neon-title {
-        text-shadow: 0 0 10px #B266FF, 0 0 20px #00f2fe;
-        color: white; font-size: 50px; text-align: center;
+    
+    .slogan-text { 
+        color: #00FF00; 
+        text-shadow: 0 0 10px #00FF00; 
+        text-align: center; 
+        font-size: 20px; 
+        margin-top: -20px;
+        font-weight: 300;
+    }
+
+    .luxury-card {
+        background: linear-gradient(145deg, rgba(30, 30, 30, 0.9), rgba(10, 10, 10, 0.9));
+        border: 2px solid #00F2FE;
+        border-radius: 20px;
+        padding: 35px;
+        margin-bottom: 25px;
+        box-shadow: 0px 10px 30px rgba(0, 242, 254, 0.2);
+    }
+    
+    h1, h2, h3, p, label { color: #FFFFFF !important; }
+    
+    .stButton>button {
+        background: #FF0000;
+        color: white;
+        border-radius: 50px;
+        padding: 15px 40px;
+        border: none;
+        box-shadow: 0 0 20px rgba(255,0,0,0.4);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. API CONNECTIVITY (เชื่อมต่อของจริง) ---
+# --- 2. การเชื่อมต่อ AI Core ---
+ai_active = False
 try:
-    # ดึง Key จาก Secrets
-    GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
-    WEATHER_KEY = st.secrets["ACCUWEATHER_API_KEY"]
-    UNSPLASH_KEY = st.secrets["UNSPLASH_ACCESS_KEY"]
+    if "GEMINI_API_KEY" in st.secrets:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        ai_active = True
+        st.sidebar.success("✅ Gemini AI Core: Active")
+    else:
+        st.sidebar.warning("⚠️ API Key not found. Using Standalone mode.")
+except Exception:
+    st.sidebar.error("❌ AI Connection Error")
 
-    # ตั้งค่า Gemini (ใช้รุ่น -latest เพื่อแก้ Error 404)
-    genai.configure(api_key=GEMINI_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
-except Exception as e:
-    st.error(f"⚠️ ตรวจพบข้อผิดพลาดในการเชื่อมต่อ API: {e}")
-
-# --- 3. INTERFACE (Desktop Mode) ---
-st.markdown('<div class="neon-title">💎 SYNAPSE 6D Pro</div>', unsafe_allow_html=True)
-st.sidebar.image("logo.jpg", use_container_width=True) # โลโก้รูปโลกของคุณ
-
-col1, col2 = st.columns([1.3, 0.7])
-
-with col1:
-    st.markdown('<div class="glow-card">', unsafe_allow_html=True)
-    st.subheader("📋 กระดานขยี้ใจความ (Lyrics Master)")
-    user_input = st.text_area("วันนี้คุณรู้สึกอย่างไร?", placeholder="เบื่อคำโกหก / พักผ่อนสายฝน...")
+# --- 3. ระบบประมวลผลเสียง (Universal Audio Engine) ---
+def synape_audio_mixer(vocal_file, bass_file):
+    if not os.path.exists(vocal_file) or not os.path.exists(bass_file):
+        return None, "System: Audio files not found on server."
     
-    if st.button("🚀 ACTIVATE ENERGY (เริ่มการบำบัด)"):
-        if user_input:
-            with st.spinner("🧠 AI กำลังดึงความจำไม่รู้ลืมและประมวลผลเสียงร้อง..."):
-                try:
-                    # AI เจนเนื้อเพลง
-                    response = model.generate_content(f"แต่งเพลงแนวบำบัดจากใจความ: {user_input}")
-                    st.session_state.lyrics = response.text
-                    st.success("ประมวลผลความฉลาดไร้ขีดจำกัดเรียบร้อย")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    try:
+        # ใช้ Librosa เพื่อรองรับไฟล์ .wav ทุกรูปแบบ (แก้ปัญหา b'\x00' error)
+        vocal, sr_v = librosa.load(vocal_file, sr=44100)
+        bass, sr_b = librosa.load(bass_file, sr=44100)
+        
+        # ปรับความยาวให้เท่ากัน (Rhythm Alignment)
+        min_len = min(len(vocal), len(bass))
+        vocal = vocal[:min_len]
+        bass = bass[:min_len]
+        
+        # ผสมเสียง (Vocal 1.0 + Bass 0.8)
+        mixed = (vocal * 1.0) + (bass * 0.8)
+        
+        # Mastering: Normalize ป้องกันเสียงแตก
+        mixed = mixed / np.max(np.abs(mixed))
+        
+        return (mixed * 32767).astype(np.int16), 44100, None
+    except Exception as e:
+        return None, None, str(e)
 
-    if 'lyrics' in st.session_state:
-        st.code(st.session_state.lyrics, language="markdown")
+# --- 4. หน้าหลัก DASHBOARD ---
+st.markdown('<p class="neon-red-logo">SYNAPSE</p>', unsafe_allow_html=True)
+st.markdown('<p class="slogan-text">อยู่นิ่งๆ ไม่เจ็บตัว | SOUND & AI THERAPY</p>', unsafe_allow_html=True)
 
-with col2:
-    st.markdown('<div class="glow-card" style="border-color:#FF3131;">', unsafe_allow_html=True)
-    st.subheader("🩺 Real-time Biometrics")
-    st.metric("ชีพจร (BPM)", "76", delta="Steady Pulse")
-    st.write("🌍 **GPS:** Bangkok, TH (Active)")
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('<div class="luxury-card">', unsafe_allow_html=True)
+user_prompt = st.text_area("บอกความในใจของคุณ ให้ AI ช่วยนำทางบทเพลง...", placeholder="วันนี้รู้สึกเหงาๆ อยากฟังแร็พแบบลึกๆ...")
+st.markdown('</div>', unsafe_allow_html=True)
 
-    # ฟังก์ชันแสดงภาพจาก Unsplash
-    st.markdown('<div class="glow-card" style="border-color:#00f2fe;">', unsafe_allow_html=True)
-    st.subheader("🌤️ Weather & Visuals")
-    st.write("ดึงข้อมูลสภาพอากาศจริงจาก AccuWeather เรียบร้อย")
-    st.markdown('</div>', unsafe_allow_html=True)
+if st.button("🚀 ACTIVATE SYNAPSE 6D"):
+    with st.spinner("กำลังจูนความถี่และวิเคราะห์สัญญาณประสาท..."):
+        # 1. ผสมเสียงดนตรีจริง
+        mixed_audio, sr, error = synape_audio_mixer("my_vocal.wav", "rap_bass.wav")
+        
+        if error:
+            st.error(f"Error: {error}")
+        elif mixed_audio is not None:
+            # 2. เรียก AI แต่งเนื้อเพลง (ถ้ามี API)
+            lyrics = "ยินดีต้อนรับสู่โหมด Standalone บทเพลงนี้สร้างจากตัวตนของคุณ"
+            if ai_active and user_prompt:
+                prompt = f"แต่งเนื้อเพลงแร็พ/R&B จากข้อความ: {user_prompt}"
+                response = model.generate_content(prompt)
+                lyrics = response.text
+            
+            # 3. แสดงผล Layout
+            col_l, col_r = st.columns(2)
+            with col_l:
+                st.markdown(f"""
+                <div class="luxury-card">
+                    <h3>🎵 บทเพลงของคุณ</h3>
+                    <p style="white-space: pre-wrap;">{lyrics}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col_r:
+                st.audio(mixed_audio, sample_rate=sr)
+                st.line_chart(mixed_audio[:20000]) # แสดง Waveform คมชัด
+                st.success("✅ Synchronization Complete")
+
+st.sidebar.markdown("---")
+st.sidebar.write("MODE: **PRO 6.0**")
+st.sidebar.write("สโลแกน: **อยู่นิ่งๆ ไม่เจ็บตัว**")
