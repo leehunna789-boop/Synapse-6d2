@@ -2,115 +2,123 @@ import numpy as np
 import streamlit as st
 from scipy.io import wavfile
 import io
-import google.generativeai as genai
 
-# --- การตั้งค่า API และโมเดล ---
+# ===========================================================
+# RBF AI MUSIC SYNTHESIZER (SINGLE-FILE VERSION)
+# ===========================================================
+
+# --- 1. CONFIG & SECRETS ---
+st.set_page_config(layout="wide", page_title="RBF AI Synthesizer")
+
+# ดึง API Key มาเก็บไว้ในตัวแปร (สำหรับเตรียมใช้ในอนาคตตามที่คุณมีใน Secrets)
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-pro')
-except:
-    st.error("กรุณาตรวจสอบการตั้งค่า GEMINI_API_KEY ใน Secrets")
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    key_status = "✅ API Key Loaded & Standby"
+except Exception:
+    API_KEY = None
+    key_status = "⚠️ No API Key in Secrets (Local Mode Only)"
 
-# -----------------------------------------------------------
-# 1. INPUT MODULE (เชื่อมต่อ AI เพื่อวิเคราะห์ดนตรี)
-# -----------------------------------------------------------
-class InputModule:
-    ROOT_VOCAB = {"C": 261.63, "C#": 277.18, "D": 293.66, "D#": 311.13, "E": 329.63, "F": 349.23, 
-                  "F#": 369.99, "G": 392.00, "G#": 415.30, "A": 440.00, "A#": 466.16, "B": 493.88} 
+# --- 2. CORE ENGINE MODULES ---
 
-    def ให้_AI_วิเคราะห์_Rhythm(self, chords, valence, arousal):
-        """ใช้ Gemini API ช่วยกำหนดความเร็วและสไตล์เพลง"""
-        prompt = f"วิเคราะห์คอร์ด {chords} อารมณ์ (Valence={valence}, Arousal={arousal}) แนะนำความเร็วเพลง (BPM) และสไตล์สั้นๆ"
-        try:
-            response = model.generate_content(prompt)
-            return response.text
-        except:
-            return "ไม่สามารถเชื่อมต่อ AI ได้ (ใช้ค่ามาตรฐาน)"
+class RBAISystem:
+    def __init__(self):
+        # ความถี่โน้ตมาตรฐาน
+        self.FREQ_MAP = {
+            "C": 261.63, "C#": 277.18, "Db": 277.18, "D": 293.66, "D#": 311.13, 
+            "Eb": 311.13, "E": 329.63, "F": 349.23, "F#": 369.99, "Gb": 369.99, 
+            "G": 392.00, "G#": 415.30, "Ab": 415.30, "A": 440.00, "A#": 466.16, 
+            "Bb": 466.16, "B": 493.88
+        }
+        self.fs = 44100  # Sampling Rate
 
-    def จัด_โครงสร้าง_คำสั่ง(self, คำสั่งคอร์ด, valence, arousal):
-        chords = [c.strip().split()[0].upper() for c in คำสั่งคอร์ด.split(',') if c.strip()]
-        chord_freqs = [self.ROOT_VOCAB.get(c, 261.63) for c in chords]
+    def generate_audio(self, chord_input, valence, arousal):
+        # --- [STAGE 1: INPUT PROCESSING] ---
+        chords = [c.strip().capitalize() for c in chord_input.split(',') if c.strip()]
+        if not chords: chords = ["C"]
         
-        # Symbolic Sequence: [Frequency, Valence, Arousal]
-        return np.array([[f, valence, arousal] for f in chord_freqs])
-
-# -----------------------------------------------------------
-# 2. AI SYNTHESIS ENGINE (สร้างเสียงตามคุณลักษณะ RBF)
-# -----------------------------------------------------------
-class AISynthesisEngine:
-    def __init__(self, samplerate=44100):
-        self.sampling_rate = samplerate
-
-    def สังเคราะห์_เสียง(self, symbolic_sequence):
         final_audio = np.array([], dtype=np.float32)
-        
-        for row in symbolic_sequence:
-            freq, valence, arousal = row
-            # ปรับความยาวโน้ตตาม Arousal (ยิ่งสูงยิ่งสั้น/กระชับ)
-            duration = 0.8 - (arousal * 0.4) 
-            t = np.linspace(0, duration, int(self.sampling_rate * duration), endpoint=False)
+
+        # --- [STAGE 2: AI SYNTHESIS (RBF LOGIC)] ---
+        for chord_name in chords:
+            # ดึง Root Note Frequency
+            root = chord_name[:2].strip() if len(chord_name)>1 and chord_name[1]=='#' else chord_name[0]
+            freq = self.FREQ_MAP.get(root, 261.63)
             
-            # สร้างเสียง Synth พื้นฐาน
-            amplitude = 0.2 + (arousal * 0.5)
-            # ผสมคลื่น Sine และ Square เล็กน้อยเพื่อให้มี Harmonic (ถ้า Valence สูงจะนุ่มนวล)
-            wave = (1-valence)*0.5 * np.sin(2 * np.pi * freq * t) + (valence)*0.5 * np.cos(2 * np.pi * freq * t)
+            # RBF: Arousal กำหนดความยาว (High Arousal = Short/Fast notes)
+            duration = 1.2 - (arousal * 0.8) 
+            t = np.linspace(0, duration, int(self.fs * duration), endpoint=False)
             
-            # ใส่ ADSR Envelope เบื้องต้น (Fade in/out)
-            fade = int(self.sampling_rate * 0.05)
-            envelope = np.ones_like(wave)
+            # RBF: Valence กำหนดเนื้อเสียง (Timbre)
+            # High Valence = Sine (Smooth), Low Valence = Sawtooth (Rough/Gritty)
+            smooth_wave = np.sin(2 * np.pi * freq * t)
+            rough_wave = 2 * (t * freq - np.floor(0.5 + t * freq))
+            
+            # ผสมคลื่นเสียงตามค่า Valence
+            combined_wave = (valence * smooth_wave) + ((1 - valence) * rough_wave)
+            
+            # RBF: Arousal กำหนดความดัง (Amplitude)
+            amp = 0.1 + (arousal * 0.5)
+            
+            # --- [STAGE 3: MASTERING (ENVELOPE & LIMITER)] ---
+            # ป้องกันเสียงคลิกด้วย ADSR ง่ายๆ (Fade In/Out)
+            fade = int(self.fs * 0.05)
+            envelope = np.ones_like(combined_wave)
             envelope[:fade] = np.linspace(0, 1, fade)
             envelope[-fade:] = np.linspace(1, 0, fade)
             
-            final_audio = np.concatenate([final_audio, wave * amplitude * envelope])
-            
+            processed_note = combined_wave * amp * envelope
+            final_audio = np.concatenate([final_audio, processed_note])
+
+        # ป้องกัน Clipping (Limiter)
+        final_audio = np.clip(final_audio, -0.9, 0.9)
         return final_audio
 
-# -----------------------------------------------------------
-# 3. STREAMLIT UI
-# -----------------------------------------------------------
-st.set_page_config(layout="wide", page_title="RBF AI Synthesizer")
-st.title("🎼 RBF AI Music Engine (API Connected)")
+# --- 3. STREAMLIT UI ---
 
-# Sidebar สำหรับ Logs
-st.sidebar.header("⚙️ System Status")
-
-# --- UI Layout ---
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    st.subheader("🎹 Input Parameters")
-    chords = st.text_input("คอร์ด (เช่น C, Am, F, G)", "C, Am, F, G")
-    v = st.slider("ความสุข (Valence)", 0.0, 1.0, 0.7)
-    a = st.slider("พลังงาน (Arousal)", 0.0, 1.0, 0.5)
-    
-    btn = st.button("🚀 สังเคราะห์เพลง", type="primary")
-
-with col2:
-    if btn:
-        system = InputModule()
-        engine = AISynthesisEngine()
-        
-        with st.spinner("AI กำลังวิเคราะห์ดนตรี..."):
-            # เรียกใช้ API
-            ai_advice = system.ให้_AI_วิเคราะห์_Rhythm(chords, v, a)
-            st.info(f"🤖 **AI Advice:** {ai_advice}")
-            
-            # ประมวลผลเสียง
-            sym_seq = system.จัด_โครงสร้าง_คำสั่ง(chords, v, a)
-            raw_audio = engine.สังเคราะห์_เสียง(sym_seq)
-            
-            st.subheader("🎵 Result")
-            st.line_chart(raw_audio[:5000]) # แสดง Waveform
-            st.audio(raw_audio, sample_rate=44100)
-            
-            # ปุ่มดาวน์โหลด
-            buffer = io.BytesIO()
-            wavfile.write(buffer, 44100, (raw_audio * 32767).astype(np.int16))
-            st.download_button("⬇️ Download WAV", buffer, "rbf_music.wav")
-            
-            st.sidebar.success("การสังเคราะห์เสร็จสมบูรณ์!")
-    else:
-        st.write("รอรับคำสั่งจากคุณอยู่ครับ...")
-
+st.title("🎼 RBF AI Music Synthesizer")
+st.sidebar.title("🛠️ System Info")
+st.sidebar.info(f"API Status: {key_status}")
 st.sidebar.markdown("---")
 st.sidebar.write("สโลแกน: **อยู่นิ่งๆ ไม่เจ็บตัว**")
+
+# Layout สำหรับ Input
+with st.container():
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        chord_text = st.text_input("ป้อนลำดับคอร์ด (คั่นด้วยเครื่องหมาย , )", "C, Am, F, G")
+    with col2:
+        val_val = st.slider("Valence (ความนุ่มนวล)", 0.0, 1.0, 0.7)
+    with col3:
+        aro_val = st.slider("Arousal (พลังงาน)", 0.0, 1.0, 0.5)
+
+# ปุ่มกดสังเคราะห์
+if st.button("🚀 สังเคราะห์และมาสเตอร์เสียงทันที", type="primary"):
+    system = RBAISystem()
+    
+    with st.spinner("กำลังคำนวณคลื่นเสียงแบบ RBF..."):
+        audio_data = system.generate_audio(chord_text, val_val, aro_val)
+        
+        st.success("สร้างเสียงเสร็จสมบูรณ์!")
+        
+        # แสดงผล Waveform
+        st.subheader("📊 Audio Waveform")
+        st.line_chart(audio_data[:5000]) 
+        
+        # ส่วนควบคุมการเล่นเสียง
+        st.subheader("🔊 Playback")
+        st.audio(audio_data, sample_rate=44100)
+        
+        # ส่วนดาวน์โหลด
+        buffer = io.BytesIO()
+        # แปลงเป็น 16-bit PCM สำหรับไฟล์ WAV
+        audio_int16 = (audio_data * 32767).astype(np.int16)
+        wavfile.write(buffer, 44100, audio_int16)
+        
+        st.download_button(
+            label="⬇️ ดาวน์โหลดไฟล์ WAV",
+            data=buffer.getvalue(),
+            file_name="rbf_ai_music.wav",
+            mime="audio/wav"
+        )
+else:
+    st.info("กรุณาป้อนคอร์ดแล้วกดปุ่มด้านบน เพื่อเริ่มต้นการทำงานของ Engine")
