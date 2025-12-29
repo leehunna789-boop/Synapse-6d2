@@ -1,1 +1,3 @@
 
+
+pip install streamlit numpy torch tensorflow transformers sc
