@@ -34,14 +34,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. AI CORE & UNLIMITED DATA SYNC ---
-# ดึงกุญแจจริงจาก Secrets เพื่อความสามารถ AI ที่สมบูรณ์
+# --- ส่วนที่ต้องแก้เพื่อให้ AI ทำงานได้จริง ---
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # บรรทัดนี้แหละครับ! ต้องไม่มีคำว่า models/ นำหน้า
+    model = genai.GenerativeModel('gemini-1.5-flash') 
 else:
-    st.error("❌ ระบบล็อก: กรุณาใส่ GEMINI_API_KEY ในหน้า Secrets")
-    st.stop()
+    st.error("❌ ระบบล็อก: ไม่พบกุญแจในหน้า Secrets")
+
 
 # โหลด IP ASSET: Control Matrix V1 & V2 (ทรัพย์สินมูลค่าสูง)
 MATRIX_V1 = {"JOY": {"f0": 0.8, "vib": 0.9}, "SAD": {"f0": 0.3, "vib": 0.2}}
