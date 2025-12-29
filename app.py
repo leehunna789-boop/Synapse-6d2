@@ -4,121 +4,110 @@ from scipy.io import wavfile
 import io
 
 # ===========================================================
-# RBF AI MUSIC SYNTHESIZER (SINGLE-FILE VERSION)
+# RBF AI MUSIC SYNTHESIZER (AUTO-GENRE EDITION)
 # ===========================================================
-
-# --- 1. CONFIG & SECRETS ---
-st.set_page_config(layout="wide", page_title="RBF AI Synthesizer")
-
-# ดึง API Key มาเก็บไว้ในตัวแปร (สำหรับเตรียมใช้ในอนาคตตามที่คุณมีใน Secrets)
-try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    key_status = "✅ API Key Loaded & Standby"
-except Exception:
-    API_KEY = None
-    key_status = "⚠️ No API Key in Secrets (Local Mode Only)"
-
-# --- 2. CORE ENGINE MODULES ---
 
 class RBAISystem:
     def __init__(self):
-        # ความถี่โน้ตมาตรฐาน
+        self.fs = 44100
         self.FREQ_MAP = {
-            "C": 261.63, "C#": 277.18, "Db": 277.18, "D": 293.66, "D#": 311.13, 
-            "Eb": 311.13, "E": 329.63, "F": 349.23, "F#": 369.99, "Gb": 369.99, 
-            "G": 392.00, "G#": 415.30, "Ab": 415.30, "A": 440.00, "A#": 466.16, 
-            "Bb": 466.16, "B": 493.88
+            "C": 261.63, "C#": 277.18, "D": 293.66, "D#": 311.13, "E": 329.63, 
+            "F": 349.23, "F#": 369.99, "G": 392.00, "G#": 415.30, "A": 440.00, 
+            "A#": 466.16, "B": 493.88
         }
-        self.fs = 44100  # Sampling Rate
+        # ชุดคอร์ดอัตโนมัติแยกตามแนวเพลง
+        self.GENRE_PRESETS = {
+            "Rap / Hip-Hop": {
+                "chords": "Am, F, E, Am", 
+                "default_valence": 0.3, 
+                "default_arousal": 0.8,
+                "desc": "เน้นลูปที่ดุดัน สั้นกระชับ และกดดันเล็กน้อย"
+            },
+            "R&B / Soul": {
+                "chords": "Cmaj7, Am7, Dm7, G7", 
+                "default_valence": 0.8, 
+                "default_arousal": 0.3,
+                "desc": "เน้นความนุ่มนวล โน้ตลากยาว และเสียงที่พริ้วไหว"
+            }
+        }
 
-    def generate_audio(self, chord_input, valence, arousal):
-        # --- [STAGE 1: INPUT PROCESSING] ---
-        chords = [c.strip().capitalize() for c in chord_input.split(',') if c.strip()]
-        if not chords: chords = ["C"]
-        
+    def generate_audio(self, chords_str, valence, arousal):
+        chords = [c.strip() for c in chords_str.split(',') if c.strip()]
         final_audio = np.array([], dtype=np.float32)
 
-        # --- [STAGE 2: AI SYNTHESIS (RBF LOGIC)] ---
         for chord_name in chords:
-            # ดึง Root Note Frequency
-            root = chord_name[:2].strip() if len(chord_name)>1 and chord_name[1]=='#' else chord_name[0]
+            # ดึงเฉพาะตัวอักษรแรกเพื่อหาความถี่ (Simple Root Note)
+            root = chord_name[0].upper()
+            if len(chord_name) > 1 and chord_name[1] == '#':
+                root += '#'
+            
             freq = self.FREQ_MAP.get(root, 261.63)
             
-            # RBF: Arousal กำหนดความยาว (High Arousal = Short/Fast notes)
-            duration = 1.2 - (arousal * 0.8) 
+            # RBF Logic:
+            duration = 1.5 - (arousal * 1.0) # Arousal สูง = โน้ตสั้นลง
             t = np.linspace(0, duration, int(self.fs * duration), endpoint=False)
             
-            # RBF: Valence กำหนดเนื้อเสียง (Timbre)
-            # High Valence = Sine (Smooth), Low Valence = Sawtooth (Rough/Gritty)
-            smooth_wave = np.sin(2 * np.pi * freq * t)
-            rough_wave = 2 * (t * freq - np.floor(0.5 + t * freq))
+            # Timbre: R&B จะนุ่มกว่า (Sine), Rap จะแข็งกว่า (Saw)
+            wave = (valence * np.sin(2 * np.pi * freq * t)) + \
+                   ((1 - valence) * (2 * (t * freq - np.floor(0.5 + t * freq))))
             
-            # ผสมคลื่นเสียงตามค่า Valence
-            combined_wave = (valence * smooth_wave) + ((1 - valence) * rough_wave)
+            # Amplitude: Arousal สูง = เสียงดังและกระแทก
+            amp = 0.2 + (arousal * 0.5)
             
-            # RBF: Arousal กำหนดความดัง (Amplitude)
-            amp = 0.1 + (arousal * 0.5)
-            
-            # --- [STAGE 3: MASTERING (ENVELOPE & LIMITER)] ---
-            # ป้องกันเสียงคลิกด้วย ADSR ง่ายๆ (Fade In/Out)
+            # ADSR Envelope
             fade = int(self.fs * 0.05)
-            envelope = np.ones_like(combined_wave)
+            envelope = np.ones_like(wave)
             envelope[:fade] = np.linspace(0, 1, fade)
             envelope[-fade:] = np.linspace(1, 0, fade)
             
-            processed_note = combined_wave * amp * envelope
-            final_audio = np.concatenate([final_audio, processed_note])
+            final_audio = np.concatenate([final_audio, wave * amp * envelope])
+            
+        return np.clip(final_audio, -0.9, 0.9)
 
-        # ป้องกัน Clipping (Limiter)
-        final_audio = np.clip(final_audio, -0.9, 0.9)
-        return final_audio
+# --- UI SECTION ---
+st.set_page_config(layout="wide", page_title="RBF Auto-Genre")
+st.title("🎼 RBF AI: Auto-Genre Synthesizer")
 
-# --- 3. STREAMLIT UI ---
+system = RBAISystem()
 
-st.title("🎼 RBF AI Music Synthesizer")
-st.sidebar.title("🛠️ System Info")
-st.sidebar.info(f"API Status: {key_status}")
-st.sidebar.markdown("---")
+# Sidebar แสดงสถานะ API (ถ้ามี)
+if "GEMINI_API_KEY" in st.secrets:
+    st.sidebar.success("✅ API Key: Standby")
+else:
+    st.sidebar.warning("⚠️ Local Mode Active")
 st.sidebar.write("สโลแกน: **อยู่นิ่งๆ ไม่เจ็บตัว**")
 
-# Layout สำหรับ Input
-with st.container():
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        chord_text = st.text_input("ป้อนลำดับคอร์ด (คั่นด้วยเครื่องหมาย , )", "C, Am, F, G")
-    with col2:
-        val_val = st.slider("Valence (ความนุ่มนวล)", 0.0, 1.0, 0.7)
-    with col3:
-        aro_val = st.slider("Arousal (พลังงาน)", 0.0, 1.0, 0.5)
+# ส่วนเลือกแนวเพลง
+st.subheader("1. เลือกแนวเพลงที่ต้องการ")
+genre = st.radio("แนวเพลง (Genre):", list(system.GENRE_PRESETS.keys()), horizontal=True)
 
-# ปุ่มกดสังเคราะห์
-if st.button("🚀 สังเคราะห์และมาสเตอร์เสียงทันที", type="primary"):
-    system = RBAISystem()
-    
-    with st.spinner("กำลังคำนวณคลื่นเสียงแบบ RBF..."):
-        audio_data = system.generate_audio(chord_text, val_val, aro_val)
+# ดึงค่าจาก Preset
+preset = system.GENRE_PRESETS[genre]
+
+# แสดงค่าที่เลือกอัตโนมัติ (แต่ยังยอมให้ผู้ใช้ปรับแต่งเองได้)
+col1, col2, col3 = st.columns(3)
+with col1:
+    chord_input = st.text_input("ชุดคอร์ด (ปรับแต่งได้):", preset["chords"])
+with col2:
+    v = st.slider("Valence (ความนุ่มนวล)", 0.0, 1.0, preset["default_valence"])
+with col3:
+    a = st.slider("Arousal (พลังงาน/ความเร็ว)", 0.0, 1.0, preset["default_arousal"])
+
+st.caption(f"💡 **สไตล์ของ {genre}:** {preset['desc']}")
+
+if st.button("🚀 เริ่มสังเคราะห์เพลงอัตโนมัติ", type="primary"):
+    with st.spinner(f"กำลังสร้างเสียงสไตล์ {genre}..."):
+        audio_data = system.generate_audio(chord_input, v, a)
         
-        st.success("สร้างเสียงเสร็จสมบูรณ์!")
+        st.success(f"เสร็จสมบูรณ์! นี่คือเสียงแนว {genre}")
         
-        # แสดงผล Waveform
-        st.subheader("📊 Audio Waveform")
-        st.line_chart(audio_data[:5000]) 
+        # Visualizer
+        st.line_chart(audio_data[:4000])
         
-        # ส่วนควบคุมการเล่นเสียง
-        st.subheader("🔊 Playback")
+        # Playback
         st.audio(audio_data, sample_rate=44100)
         
-        # ส่วนดาวน์โหลด
+        # Download
         buffer = io.BytesIO()
-        # แปลงเป็น 16-bit PCM สำหรับไฟล์ WAV
-        audio_int16 = (audio_data * 32767).astype(np.int16)
-        wavfile.write(buffer, 44100, audio_int16)
-        
-        st.download_button(
-            label="⬇️ ดาวน์โหลดไฟล์ WAV",
-            data=buffer.getvalue(),
-            file_name="rbf_ai_music.wav",
-            mime="audio/wav"
-        )
-else:
-    st.info("กรุณาป้อนคอร์ดแล้วกดปุ่มด้านบน เพื่อเริ่มต้นการทำงานของ Engine")
+        wavfile.write(buffer, 44100, (audio_data * 32767).astype(np.int16))
+        st.download_button("⬇️ ดาวน์โหลด WAV", buffer.getvalue(), f"{genre}_rbf.wav")
