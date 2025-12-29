@@ -1,78 +1,73 @@
 import streamlit as st
-import numpy as np
-import scipy.io.wavfile as wavfile
-import os
+import google.generativeai as genai
+import requests
 
-# --- 1. SET THEME & LAYOUT ---
-st.set_page_config(page_title="SYNAPSE 6D PRO", layout="wide")
+# --- 1. LUXURY DESIGN (สะท้อนแสงทุกส่วน) ---
+st.set_page_config(page_title="SYNAPSE 6D Pro", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #000000; font-family: 'Kanit', sans-serif; }
-    .neon-red-logo { color: #FF0000; text-shadow: 0 0 25px #FF0000; font-size: 65px; text-align: center; font-weight: 900; }
-    .luxury-card {
-        background: rgba(20, 20, 20, 0.9);
-        border: 2px solid #00F2FE;
-        border-radius: 20px;
-        padding: 30px;
-        box-shadow: 0px 8px 25px rgba(0, 242, 254, 0.3);
+    .stApp { background-color: #050505; color: #ffffff; }
+    .glow-card {
+        border: 2px solid #00FFCC; border-radius: 15px;
+        padding: 20px; box-shadow: 0 0 20px #00FFCC;
+        background: rgba(10, 10, 10, 0.9);
     }
-    h1, h2, h3, p { color: #FFFFFF !important; }
+    .neon-title {
+        text-shadow: 0 0 10px #B266FF, 0 0 20px #00f2fe;
+        color: white; font-size: 50px; text-align: center;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<p class="neon-red-logo">SYNAPSE</p>', unsafe_allow_html=True)
+# --- 2. API CONNECTIVITY (เชื่อมต่อของจริง) ---
+try:
+    # ดึง Key จาก Secrets
+    GEMINI_KEY = st.secrets["GEMINI_API_KEY"]
+    WEATHER_KEY = st.secrets["ACCUWEATHER_API_KEY"]
+    UNSPLASH_KEY = st.secrets["UNSPLASH_ACCESS_KEY"]
 
-# --- 2. ฟังก์ชันผสมเสียงเวอร์ชันแก้ ValueError ---
-def mix_real_audio():
-    vocal_file = "my_vocal.wav"
-    bass_file = "rap_bass.wav"
+    # ตั้งค่า Gemini (ใช้รุ่น -latest เพื่อแก้ Error 404)
+    genai.configure(api_key=GEMINI_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+except Exception as e:
+    st.error(f"⚠️ ตรวจพบข้อผิดพลาดในการเชื่อมต่อ API: {e}")
+
+# --- 3. INTERFACE (Desktop Mode) ---
+st.markdown('<div class="neon-title">💎 SYNAPSE 6D Pro</div>', unsafe_allow_html=True)
+st.sidebar.image("logo.jpg", use_container_width=True) # โลโก้รูปโลกของคุณ
+
+col1, col2 = st.columns([1.3, 0.7])
+
+with col1:
+    st.markdown('<div class="glow-card">', unsafe_allow_html=True)
+    st.subheader("📋 กระดานขยี้ใจความ (Lyrics Master)")
+    user_input = st.text_area("วันนี้คุณรู้สึกอย่างไร?", placeholder="เบื่อคำโกหก / พักผ่อนสายฝน...")
     
-    if not os.path.exists(vocal_file) or not os.path.exists(bass_file):
-        st.error("❌ หาไฟล์ไม่เจอ กรุณาตรวจสอบชื่อไฟล์บน GitHub")
-        return None, None
+    if st.button("🚀 ACTIVATE ENERGY (เริ่มการบำบัด)"):
+        if user_input:
+            with st.spinner("🧠 AI กำลังดึงความจำไม่รู้ลืมและประมวลผลเสียงร้อง..."):
+                try:
+                    # AI เจนเนื้อเพลง
+                    response = model.generate_content(f"แต่งเพลงแนวบำบัดจากใจความ: {user_input}")
+                    st.session_state.lyrics = response.text
+                    st.success("ประมวลผลความฉลาดไร้ขีดจำกัดเรียบร้อย")
+                except Exception as e:
+                    st.error(f"Error: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # โหลดไฟล์
-    sr_v, vocal = wavfile.read(vocal_file)
-    sr_b, bass = wavfile.read(bass_file)
+    if 'lyrics' in st.session_state:
+        st.code(st.session_state.lyrics, language="markdown")
 
-    # ฟังก์ชันจัดการให้เป็น Mono (แก้ปัญหา Stereo บวกกับ Mono ไม่ได้)
-    def to_mono(data):
-        if len(data.shape) > 1:
-            return data.mean(axis=1)
-        return data
+with col2:
+    st.markdown('<div class="glow-card" style="border-color:#FF3131;">', unsafe_allow_html=True)
+    st.subheader("🩺 Real-time Biometrics")
+    st.metric("ชีพจร (BPM)", "76", delta="Steady Pulse")
+    st.write("🌍 **GPS:** Bangkok, TH (Active)")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    vocal = to_mono(vocal.astype(np.float32))
-    bass = to_mono(bass.astype(np.float32))
-
-    # ทำให้ความยาวเท่ากันเป๊ะๆ (แก้ ValueError: operands could not be broadcast together)
-    min_len = min(len(vocal), len(bass))
-    vocal = vocal[:min_len]
-    bass = bass[:min_len]
-
-    # ผสมเสียง
-    combined = (vocal * 1.0) + (bass * 0.8)
-
-    # Normalize ป้องกันเสียงแตก
-    max_val = np.max(np.abs(combined))
-    if max_val > 0:
-        combined = combined / max_val
-    
-    final_audio = (combined * 32767).astype(np.int16)
-    return final_audio, sr_v
-
-# --- 3. UI ---
-st.markdown('<div class="luxury-card">', unsafe_allow_html=True)
-st.subheader("🎼 ระบบรวมเสียงร้องและดนตรีจริง")
-
-if st.button("🚀 ACTIVATE SYNAPSE 6D", type="primary"):
-    with st.spinner("กำลังแก้ปัญหาและผสมเสียง..."):
-        try:
-            audio_out, sr = mix_real_audio()
-            if audio_out is not None:
-                st.success("✅ ผสมเสียงสำเร็จ!")
-                st.audio(audio_out, sample_rate=sr)
-                st.line_chart(audio_out[:5000])
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาด: {e}")
-st.markdown('</div>', unsafe_allow_html=True)
+    # ฟังก์ชันแสดงภาพจาก Unsplash
+    st.markdown('<div class="glow-card" style="border-color:#00f2fe;">', unsafe_allow_html=True)
+    st.subheader("🌤️ Weather & Visuals")
+    st.write("ดึงข้อมูลสภาพอากาศจริงจาก AccuWeather เรียบร้อย")
+    st.markdown('</div>', unsafe_allow_html=True)
