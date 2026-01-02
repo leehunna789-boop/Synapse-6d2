@@ -6,3 +6,4 @@ scipy
 gTTS
 scipy
 pyworld
+setuptools
