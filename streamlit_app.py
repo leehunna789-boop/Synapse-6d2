@@ -1,159 +1,215 @@
 import streamlit as st
-import time
-import random
 import numpy as np
-import pandas as pd
 import io
 from scipy.io.wavfile import write
-from gtts import gTTS
+import random
 
 # ---------------------------------------------------------
-# ตั้งค่าหน้าจอ (Theme: Deep Matrix)
+# 1. UI CONFIGURATION (DARK & RAW MODE)
 # ---------------------------------------------------------
-st.set_page_config(page_title="SYNAPSE 6D: DUAL CORE", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="SYS_AUDIO_CORE", page_icon="◾", layout="wide")
 
 st.markdown("""
 <style>
-    /* พื้นหลังดำ ตัวหนังสือเขียวเข้มแบบ Hacker */
-    .stApp { background-color: #050505; color: #00FF41; font-family: 'Courier New', monospace; }
+    /* นำเข้าฟอนต์สไตล์ Coding */
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;800&display=swap');
+
+    .stApp { 
+        background-color: #000000; 
+        color: #B0B0B0; 
+        font-family: 'JetBrains Mono', monospace;
+    }
     
-    /* กรอบแสดงผลข้อมูล */
-    .monitor-box {
-        border: 1px solid #00FF41;
+    /* หัวข้อใหญ่แบบดุดัน */
+    .sys-header { 
+        font-size: 32px; 
+        font-weight: 800; 
+        color: #FFFFFF; 
+        letter-spacing: -2px; 
+        border-bottom: 2px solid #333;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+    
+    /* กรอบข้อมูล */
+    .terminal-box {
+        border: 1px solid #333;
         padding: 15px;
-        background-color: #001100;
-        margin-bottom: 10px;
-        border-radius: 5px;
+        background: #0A0A0A;
+        font-size: 12px;
+        color: #00FF00; /* เขียว Terminal */
+    }
+
+    /* ปุ่มกดสไตล์เครื่องจักร */
+    .stButton>button { 
+        border: 1px solid #444; 
+        color: #FFF; 
+        background: #000; 
+        border-radius: 0px; /* เหลี่ยมจัด */
+        width: 100%; 
+        height: 45px; 
+        font-family: 'JetBrains Mono', monospace;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.2s;
+    }
+    .stButton>button:hover { 
+        border-color: #FFF; 
+        background: #111; 
+        color: #FFF;
     }
     
-    /* ตัวหนังสือหัวข้อใหญ่ */
-    .big-title { 
-        font-size: 45px; 
-        font-weight: 900; 
-        color: #00FF41; 
-        text-align: center; 
-        text-shadow: 0 0 15px #00FF41;
-        letter-spacing: 2px;
-    }
+    /* ซ่อน Decoration ของ Streamlit */
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# ระบบสร้างเสียง (Sound Engine)
+# 2. AUDIO ENGINE (CORE LOGIC)
 # ---------------------------------------------------------
-def generate_frequency(freq, duration=5):
-    """สร้างเสียงคลื่นความถี่ (Sine Wave)"""
+def create_waveform(freq, duration, type='sine'):
     fs = 44100
     t = np.linspace(0, duration, int(fs * duration), False)
-    # ผสมคลื่น 2 ลูกให้เสียงดูมีมิติ (Binaural Beats Simulation)
-    tone = np.sin(freq * t * 2 * np.pi) + (0.5 * np.sin((freq+4) * t * 2 * np.pi))
-    audio = (tone * 0.3 * 32767).astype(np.int16)
+    if type == 'sine':
+        return np.sin(2 * np.pi * freq * t)
+    elif type == 'square':
+        return np.sign(np.sin(2 * np.pi * freq * t))
+    elif type == 'saw':
+        return 2 * (t * freq - np.floor(t * freq + 0.5))
+    return np.zeros_like(t)
+
+def generate_track(genre, duration=10):
+    fs = 44100
+    total_samples = int(fs * duration)
+    output = np.zeros(total_samples)
+    
+    # PARAMETERS (ตั้งค่าตามแนวเพลง)
+    bpm = 90
+    kick_freq = 60
+    
+    if genre == "TRAP_HH": # Trap / HipHop
+        bpm = 140
+        kick_freq = 55
+        pattern = [1, 0, 0, 0, 1, 0, 0, 0] # Kick pattern
+        
+    elif genre == "HEAVY_ROCK": # Rock
+        bpm = 120
+        kick_freq = 80
+        pattern = [1, 0, 1, 0, 1, 0, 1, 0]
+        
+    elif genre == "SOUL_RB": # R&B
+        bpm = 75
+        kick_freq = 50
+        pattern = [1, 0, 0, 0, 0, 0, 1, 0]
+        
+    else: # Default
+        pattern = [1, 0, 0, 0]
+
+    # BEAT GENERATION LOOP
+    beat_len = int(fs * (60/bpm))
+    current_pos = 0
+    step = 0
+    
+    # สร้างเสียง Kick (เสียงเบสกระแทก)
+    t_kick = np.linspace(0, 0.3, int(fs*0.3), False)
+    kick_wave = np.sin(2*np.pi*kick_freq*t_kick) * np.exp(-10*t_kick)
+    
+    # สร้างเสียง Hihat (เสียงแหลม)
+    noise = np.random.uniform(-0.5, 0.5, int(fs*0.05))
+    hihat_wave = noise * np.exp(-30*np.linspace(0, 0.05, len(noise)))
+
+    while current_pos < total_samples - fs:
+        # ใส่ Kick ตาม Pattern
+        if pattern[step % len(pattern)] == 1:
+            end = min(current_pos + len(kick_wave), total_samples)
+            output[current_pos:end] += kick_wave[:end-current_pos] * 0.8
+            
+        # ใส่ Hihat ทุกจังหวะ (Metronome)
+        if step % 2 == 0:
+            end = min(current_pos + len(hihat_wave), total_samples)
+            output[current_pos:end] += hihat_wave[:end-current_pos] * 0.3
+
+        current_pos += int(beat_len / 2) # ขยับทีละครึ่งจังหวะ
+        step += 1
+
+    # SYNTH LAYER (เสียงคอร์ด)
+    t = np.linspace(0, duration, total_samples, False)
+    if genre == "HEAVY_ROCK":
+        # Distortion Bass
+        synth = np.sign(np.sin(2*np.pi*55*t)) * 0.1
+    elif genre == "TRAP_HH":
+        # Sub Bass Sine
+        synth = np.sin(2*np.pi*40*t) * 0.3
+    else:
+        # Smooth Chord
+        synth = (np.sin(2*np.pi*261*t) + np.sin(2*np.pi*329*t)) * 0.1
+        
+    final_mix = output + synth
+    
+    # Normalize
+    max_val = np.max(np.abs(final_mix))
+    if max_val > 0: final_mix /= max_val
+    
+    # Export
     virtual_file = io.BytesIO()
-    write(virtual_file, fs, audio)
-    return virtual_file
-
-def generate_voice_ai(text):
-    """สร้างเสียงพูด AI"""
-    try:
-        tts = gTTS(text=text, lang='th')
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        return fp
-    except:
-        return None
+    write(virtual_file, fs, (final_mix * 32767 * 0.8).astype(np.int16))
+    return virtual_file, bpm
 
 # ---------------------------------------------------------
-# ส่วนแสดงผลหลัก (Main Interface)
+# 3. INTERFACE (DISPLAY)
 # ---------------------------------------------------------
-st.markdown('<p class="big-title">SYNAPSE 6D PRO</p>', unsafe_allow_html=True)
-st.markdown('<div style="text-align: center;">SYSTEM STATUS: <span style="color: #00FF41;">ONLINE</span> | DUAL CORE ENGINE</div>', unsafe_allow_html=True)
-st.markdown("---")
+st.markdown('<div class="sys-header">/// SYSTEM_AUDIO_GATEWAY_V.1</div>', unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 1])
+col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.header("📥 INPUT DATA")
-    user_input = st.text_area("ป้อนข้อมูลความรู้สึก / Input Text:", height=100)
+    st.write("INPUT_PARAMETERS:")
+    genre_input = st.selectbox("", ["TRAP_HH", "SOUL_RB", "HEAVY_ROCK"], label_visibility="collapsed")
     
-    # ปุ่มกดที่ดูทรงพลัง
-    if st.button("🚀 EXECUTE SYNTHESIS (ประมวลผล)", use_container_width=True):
-        if user_input:
-            # --- ส่วนประมวลผล (Processing) ---
-            with st.spinner("Decoding Phonemes & F0 Pitch..."):
-                time.sleep(1.5) # เท่ๆ
-                
-                # คำนวณค่าต่างๆ (Fake Logic ให้ดูเหมือนรูปที่ส่งมา)
-                f0_val = random.randint(200, 400)
-                phoneme_count = len(user_input) * 2
-                freq_hz = 432 + (len(user_input) % 50)
-                
-                # 1. สร้างเสียงคลื่น (Frequency)
-                tone_file = generate_frequency(freq_hz)
-                
-                # 2. สร้างเสียงพูด (Voice)
-                reply_text = f"รับทราบ ระบบได้ปรับจูนความถี่ {freq_hz} เฮิรตซ์ เพื่อความสมดุลของคุณแล้ว"
-                voice_file = generate_voice_ai(reply_text)
-                
-                st.success("SYNTHESIS COMPLETE.")
-                
-                # --- แสดงผลลัพธ์เสียง (Audio Output) ---
-                st.markdown("### 🔊 AUDIO OUTPUT CHANNELS")
-                
-                st.write(f"**Channel 1: Healing Frequency ({freq_hz} Hz)**")
-                st.audio(tone_file, format='audio/wav')
-                
-                st.write("**Channel 2: AI Voice Guidance**")
-                if voice_file:
-                    st.audio(voice_file, format='audio/mp3')
-                
-                # --- ส่วนแสดง Code แบบในรูป (Simulation) ---
-                st.markdown("### 🧬 GENERATED SYNTAX (LOG)")
-                st.code(f"""
-# SYNTHESIS REPORT ID: {random.randint(1000,9999)}
-pyworld-tex {{
-    input_text = "{user_input[:10]}..."
-    phonemes = {{
-        count = {phoneme_count}
-        base_f0 = {f0_val} Hz
-        modulation = 'sine_wave'
-    }}
-    spectral_envelope {{
-        bandwidth = {freq_hz} Hz
-        density = 'high_resonance'
-    }}
-    output_status = 'RENDERED_SUCCESSFULLY'
-}}
-                """, language="javascript")
+    st.write("TIME_FRAME (SEC):")
+    duration_input = st.slider("", 5, 20, 10, label_visibility="collapsed")
+    
+    st.markdown("---")
+    
+    # ปุ่มกดแบบดิบๆ
+    if st.button("> EXECUTE_SEQUENCE"):
+        with st.spinner("PROCESSING_WAVEFORMS..."):
+            audio_data, bpm_out = generate_track(genre_input, duration_input)
+            
+            st.success("RENDER_COMPLETE.")
+            
+            # โชว์เครื่องเล่น
+            st.markdown("OUTPUT_CHANNEL_01:")
+            st.audio(audio_data, format='audio/wav')
+            
+            # เก็บค่าไว้แสดงผล Log
+            st.session_state['log'] = f"""
+            > TARGET: {genre_input}
+            > BPM: {bpm_out}
+            > BUFFER: {duration_input}s
+            > STATUS: EXPORTED
+            """
 
 with col2:
-    st.header("📊 SPECTRAL MONITOR")
-    # แสดงกราฟแบบ Real-time (จำลอง)
-    
-    # กราฟ 1: Pitch Contour
-    st.write("📈 F0 Pitch Contour")
-    chart_data = pd.DataFrame(
-        np.random.randn(20, 3),
-        columns=['F0', 'Harmonics', 'Noise']
-    )
-    st.line_chart(chart_data)
-    
-    # กราฟ 2: Energy Matrix
-    st.write("💠 Energy Distribution")
-    bar_data = pd.DataFrame({
-        'Band': ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'],
-        'Power': np.random.randint(20, 100, 5)
-    })
-    st.bar_chart(bar_data.set_index('Band'))
-    
-    # กล่องข้อความเท่ๆ
+    st.write("SYSTEM_LOG:")
+    # ส่วนแสดงผลแบบ Code Terminal
+    log_text = st.session_state.get('log', "> WAITING_FOR_COMMAND...")
     st.markdown(f"""
-    <div class="monitor-box">
-    <b>CORE LOGIC:</b><br>
-    > Initializing Vowel Synthesis... OK<br>
-    > Loading Acoustic Model... OK<br>
-    > Matching Pitch Target... {random.randint(90,100)}%<br>
-    > <b>READY TO STREAM</b>
+    <div class="terminal-box">
+    ROOT@SERVER:~$ ./init_audio_engine<br>
+    [OK] LIBRARIES LOADED<br>
+    [OK] DRIVER: VIRTUAL_DAC<br>
+    ---------------------------------<br>
+    {log_text.replace(chr(10), '<br>')}
+    <br>
+    <span style="animation: blink 1s infinite;">_</span>
     </div>
     """, unsafe_allow_html=True)
+    
+    # กราฟิกคลื่นเสียงแบบเส้นเดียว (Minimal)
+    st.write("")
+    st.write("VISUAL_MONITOR:")
+    chart_data = [random.random() for _ in range(50)]
+    st.area_chart(chart_data, color="#333333")
 
