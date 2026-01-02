@@ -1,68 +1,85 @@
-import os
-import time
-import json
-import base64
-import struct
-import requests  # ต้องติดตั้ง: pip install requests
+import streamlit as st
+import google.generativeai as genai
+import pyworld as pw
+import numpy as np
+import soundfile as sf
+import matplotlib.pyplot as plt
+import matplotlib
 
-# --- ส่วนที่ 1: ฟังก์ชันระบบ (ห้ามแก้ส่วนนี้) ---
+# ตั้งค่า Matplotlib ให้รันบน Server ได้ (Agg mode)
+matplotlib.use('Agg')
 
-def pcm_to_wav(pcm_data, sample_rate=24000):
-    data_size = len(pcm_data)
-    header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + data_size, b'WAVE', b'fmt ', 16, 1, 1, sample_rate, sample_rate * 2, 2, 16, b'data', data_size)
-    return header + pcm_data
+# 1. ตั้งค่าความปลอดภัยเรียกใช้กุญแจจาก Secrets
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-def generate_lyrics(topic, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={api_key}"
-    try:
-        response = requests.post(url, json={"contents": [{"parts": [{"text": f"แต่งเนื้อเพลงสั้นๆ 4 บรรทัด เรื่อง: {topic} (ภาษาไทย)"}]}]}, headers={'Content-Type': 'application/json'})
-        return response.json()['candidates'][0]['content']['parts'][0]['text']
-    except:
-        return None
+# กำหนด System Instruction ตามบทบาทนักแต่งเพลงของคุณ
+instruction = (
+    "คุณคือนักแต่งเพลงมืออาชีพ สโลแกนคือ 'อยู่นิ่งๆ ไม่เจ็บตัว' "
+    "กฎ: ต้องระบุคอร์ดเหนือเนื้อเพลง และวิเคราะห์คำศัพท์ตอนท้ายเสมอ"
+)
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash', 
+    system_instruction=instruction
+)
 
-def generate_audio(text, filename, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={api_key}"
-    payload = {
-        "contents": [{"parts": [{"text": text}]}],
-        "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}}}
-    }
-    try:
-        res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'})
-        audio_data = res.json()['candidates'][0]['content']['parts'][0]['inlineData']['data']
-        with open(filename, "wb") as f:
-            f.write(pcm_to_wav(base64.b64decode(audio_data)))
-        return True
-    except:
-        return False
-
-# --- ส่วนที่ 2: เริ่มทำงาน (Main) ---
-if __name__ == "__main__":
+# 2. ฟังก์ชันหลักสำหรับวิเคราะห์และสังเคราะห์เสียงร้อง (Matrix V1)
+def synapse_vocal_engine(input_audio, fs, valence):
+    # วิเคราะห์เสียงต้นแบบ (Analysis)
+    # ใช้ High-level API ตามที่คุณระบุ
+    f0, sp, ap = pw.wav2world(input_audio, fs)
     
-    print("--- เริ่มต้นโปรแกรม AI Songwriter ---")
-
-    # ✅ ผมใส่บรรทัดนี้ให้แล้วครับ มันจะดึงรหัสจากเครื่องคุณเอง
-    MY_API_KEY = os.environ.get("GEMINI_API_KEY")
-
-    if not MY_API_KEY:
-        print("❌ ผิดพลาด: หา GEMINI_API_KEY ในเครื่องไม่เจอครับ")
-        exit()
-    else:
-        print("✅ ดึงกุญแจสำเร็จ! พร้อมทำงาน")
-
-    # เปลี่ยนหัวข้อเพลงตรงนี้ได้ครับ
-    topic = "อยู่นิ่งๆ ไม่เจ็บตัว"
-    print(f"\n🎵 กำลังแต่งเพลงเรื่อง: {topic}")
-
-    # สั่งทำงาน
-    lyrics = generate_lyrics(topic, MY_API_KEY)
+    # ขยี้อารมณ์ด้วย Matrix V1 (Pitch Control)
+    # ปรับ f0 ตามค่าความสุข/เศร้า (Valence)
+    # ตัวอย่าง: ถ้าเศร้า f0 จะต่ำลง
+    modified_f0 = f0 * (0.8 + (valence * 0.4))
     
-    if lyrics:
-        print(f"\n--- เนื้อเพลง ---\n{lyrics}\n-----------------")
+    # สังเคราะห์กลับเป็นเสียงใหม่ (Synthesis)
+    y = pw.synthesize(modified_f0, sp, ap, fs)
+    return y, modified_f0, sp
+
+# 3. ส่วนการแสดงผลบนหน้าจอ (UI)
+st.set_page_config(page_title="SYNAPSE", page_icon="🌐")
+st.title("🌐 SYNAPSE: Sound & Visual Therapy")
+st.caption("Slogan: อยู่นิ่งๆ ไม่เจ็บตัว (Stay Still & Heal)") #
+
+# ช่องรับ Input
+user_note = st.text_input("ใจความสั้นๆ ที่จะให้ AI ขยี้...", placeholder="เช่น ความเหงาในเมืองใหญ่")
+
+if st.button("GENERATE & HEAL"):
+    with st.spinner('AI กำลังขยี้ใจความและสังเคราะห์เสียงบำบัด...'):
+        # --- ส่วนของ Gemini ---
+        response = model.generate_content(user_note)
+        st.subheader("🎵 Lyrics & Chords")
+        st.write(response.text) #
         
-        print("🔊 กำลังสร้างไฟล์เสียง...")
-        if generate_audio(lyrics, "my_song.wav", MY_API_KEY):
-            print("✅ เรียบร้อย! ไฟล์เสียงชื่อ 'my_song.wav' มาแล้วครับ")
-        else:
-            print("❌ สร้างเสียงไม่สำเร็จ")
-    else:
-        print("❌ แต่งเพลงไม่สำเร็จ")
+        # --- ส่วนของ PyWorld (จำลองเสียงต้นแบบ) ---
+        # ในการใช้งานจริงควรใช้ไฟล์เสียงร้องที่คุณเตรียมไว้
+        fs = 44100
+        t = np.linspace(0, 2, fs * 2)
+        x = np.sin(2 * np.pi * 440 * t).astype(np.float64) # Dummy input
+        
+        # สมมติค่า Valence จากเนื้อหา (0.0 - 1.0)
+        mood_valence = 0.3 if "เหงา" in user_note or "เศร้า" in user_note else 0.7
+        
+        # รันเครื่องยนต์เสียง
+        y, f0_new, sp_new = synapse_vocal_engine(x, fs, mood_valence)
+        
+        # บันทึกไฟล์เสียง
+        output_path = "syntinsefs.wav"
+        sf.write(output_path, y, fs)
+        
+        # --- ส่วนการแสดงผลกราฟ (Visual Therapy) ---
+        st.subheader("📊 Visual Matrix Analysis")
+        fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+        
+        ax[0].plot(f0_new, color='#FF0000') # สีแดงตามธีมคุณ
+        ax[0].set_title('Pitch Contour (f0)')
+        
+        ax[1].imshow(np.log(sp_new).T, aspect='auto', origin='lower', cmap='magma')
+        ax[1].set_title('Spectral Envelope (Voice Identity)')
+        
+        st.pyplot(fig) # แสดงผลผ่าน Agg mode
+        
+        # เล่นเสียง
+        st.audio(output_path)
+        st.success("บำบัดสำเร็จ! ข้อมูลถูกบันทึกลง Story List แล้ว")
