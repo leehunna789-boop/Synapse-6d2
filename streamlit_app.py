@@ -1,237 +1,68 @@
-import streamlit as st
-import numpy as np
-import io
-from scipy.io.wavfile import write
-import random
+import os
+import time
+import json
+import base64
+import struct
+import requests  # ต้องติดตั้ง: pip install requests
 
-# ... (ฟังก์ชัน pcm_to_wav, request_with_retry, call_gemini_ai เหมือนเดิม) ...
-# ... (ฟังก์ชัน call_gemini_tts เหมือนเดิม) ...
+# --- ส่วนที่ 1: ฟังก์ชันระบบ (ห้ามแก้ส่วนนี้) ---
 
-# --- ส่วนเรียกใช้งาน ---
+def pcm_to_wav(pcm_data, sample_rate=24000):
+    data_size = len(pcm_data)
+    header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + data_size, b'WAVE', b'fmt ', 16, 1, 1, sample_rate, sample_rate * 2, 2, 16, b'data', data_size)
+    return header + pcm_data
+
+def generate_lyrics(topic, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={api_key}"
+    try:
+        response = requests.post(url, json={"contents": [{"parts": [{"text": f"แต่งเนื้อเพลงสั้นๆ 4 บรรทัด เรื่อง: {topic} (ภาษาไทย)"}]}]}, headers={'Content-Type': 'application/json'})
+        return response.json()['candidates'][0]['content']['parts'][0]['text']
+    except:
+        return None
+
+def generate_audio(text, filename, api_key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={api_key}"
+    payload = {
+        "contents": [{"parts": [{"text": text}]}],
+        "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Aoede"}}}}
+    }
+    try:
+        res = requests.post(url, json=payload, headers={'Content-Type': 'application/json'})
+        audio_data = res.json()['candidates'][0]['content']['parts'][0]['inlineData']['data']
+        with open(filename, "wb") as f:
+            f.write(pcm_to_wav(base64.b64decode(audio_data)))
+        return True
+    except:
+        return False
+
+# --- ส่วนที่ 2: เริ่มทำงาน (Main) ---
 if __name__ == "__main__":
     
-    # 2. แก้บรรทัดนี้ เพื่อดึง Key มาจากที่เก็บครับ
-    # เปลี่ยน "ชื่อ_KEY_ของคุณ" เป็นชื่อที่คุณตั้งไว้ในระบบ (เช่น 'GEMINI_API_KEY')
+    print("--- เริ่มต้นโปรแกรม AI Songwriter ---")
+
+    # ✅ ผมใส่บรรทัดนี้ให้แล้วครับ มันจะดึงรหัสจากเครื่องคุณเอง
     MY_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-    # เช็คว่าดึงมาได้ไหม (กันพลาด)
     if not MY_API_KEY:
-        print("Error: ไม่พบ API Key! กรุณาตรวจสอบว่าตั้งค่า Environment Variable แล้ว")
+        print("❌ ผิดพลาด: หา GEMINI_API_KEY ในเครื่องไม่เจอครับ")
         exit()
-
-    # --- รันคำสั่งปกติ ---
-    concept = "อยู่นิ่งๆ ไม่เจ็บตัว"
-    print(f"กำลังแต่งเพลงเกี่ยวกับ: {concept} ...")
-    
-    prompt = f"แต่งเนื้อเพลงสั้นๆ เกี่ยวกับ: {concept} เป็นภาษาไทย ขอสั้นๆ 4 บรรทัดพอ"
-    lyrics = call_gemini_ai(prompt, MY_API_KEY)
-    
-# ---------------------------------------------------------
-# 1. UI CONFIGURATION (DARK & RAW MODE)
-# ---------------------------------------------------------
-st.set_page_config(page_title="SYS_AUDIO_CORE", page_icon="◾", layout="wide")
-
-st.markdown("""
-<style>
-    /* นำเข้าฟอนต์สไตล์ Coding */
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;800&display=swap');
-
-    .stApp { 
-        background-color: #000000; 
-        color: #B0B0B0; 
-        font-family: 'JetBrains Mono', monospace;
-    }
-    
-    /* หัวข้อใหญ่แบบดุดัน */
-    .sys-header { 
-        font-size: 32px; 
-        font-weight: 800; 
-        color: #FFFFFF; 
-        letter-spacing: -2px; 
-        border-bottom: 2px solid #333;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-    }
-    
-    /* กรอบข้อมูล */
-    .terminal-box {
-        border: 1px solid #333;
-        padding: 15px;
-        background: #0A0A0A;
-        font-size: 12px;
-        color: #00FF00; /* เขียว Terminal */
-    }
-
-    /* ปุ่มกดสไตล์เครื่องจักร */
-    .stButton>button { 
-        border: 1px solid #444; 
-        color: #FFF; 
-        background: #000; 
-        border-radius: 0px; /* เหลี่ยมจัด */
-        width: 100%; 
-        height: 45px; 
-        font-family: 'JetBrains Mono', monospace;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        transition: all 0.2s;
-    }
-    .stButton>button:hover { 
-        border-color: #FFF; 
-        background: #111; 
-        color: #FFF;
-    }
-    
-    /* ซ่อน Decoration ของ Streamlit */
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
-
-# ---------------------------------------------------------
-# 2. AUDIO ENGINE (CORE LOGIC)
-# ---------------------------------------------------------
-def create_waveform(freq, duration, type='sine'):
-    fs = 44100
-    t = np.linspace(0, duration, int(fs * duration), False)
-    if type == 'sine':
-        return np.sin(2 * np.pi * freq * t)
-    elif type == 'square':
-        return np.sign(np.sin(2 * np.pi * freq * t))
-    elif type == 'saw':
-        return 2 * (t * freq - np.floor(t * freq + 0.5))
-    return np.zeros_like(t)
-
-def generate_track(genre, duration=10):
-    fs = 44100
-    total_samples = int(fs * duration)
-    output = np.zeros(total_samples)
-    
-    # PARAMETERS (ตั้งค่าตามแนวเพลง)
-    bpm = 90
-    kick_freq = 60
-    
-    if genre == "TRAP_HH": # Trap / HipHop
-        bpm = 140
-        kick_freq = 55
-        pattern = [1, 0, 0, 0, 1, 0, 0, 0] # Kick pattern
-        
-    elif genre == "HEAVY_ROCK": # Rock
-        bpm = 120
-        kick_freq = 80
-        pattern = [1, 0, 1, 0, 1, 0, 1, 0]
-        
-    elif genre == "SOUL_RB": # R&B
-        bpm = 75
-        kick_freq = 50
-        pattern = [1, 0, 0, 0, 0, 0, 1, 0]
-        
-    else: # Default
-        pattern = [1, 0, 0, 0]
-
-    # BEAT GENERATION LOOP
-    beat_len = int(fs * (60/bpm))
-    current_pos = 0
-    step = 0
-    
-    # สร้างเสียง Kick (เสียงเบสกระแทก)
-    t_kick = np.linspace(0, 0.3, int(fs*0.3), False)
-    kick_wave = np.sin(2*np.pi*kick_freq*t_kick) * np.exp(-10*t_kick)
-    
-    # สร้างเสียง Hihat (เสียงแหลม)
-    noise = np.random.uniform(-0.5, 0.5, int(fs*0.05))
-    hihat_wave = noise * np.exp(-30*np.linspace(0, 0.05, len(noise)))
-
-    while current_pos < total_samples - fs:
-        # ใส่ Kick ตาม Pattern
-        if pattern[step % len(pattern)] == 1:
-            end = min(current_pos + len(kick_wave), total_samples)
-            output[current_pos:end] += kick_wave[:end-current_pos] * 0.8
-            
-        # ใส่ Hihat ทุกจังหวะ (Metronome)
-        if step % 2 == 0:
-            end = min(current_pos + len(hihat_wave), total_samples)
-            output[current_pos:end] += hihat_wave[:end-current_pos] * 0.3
-
-        current_pos += int(beat_len / 2) # ขยับทีละครึ่งจังหวะ
-        step += 1
-
-    # SYNTH LAYER (เสียงคอร์ด)
-    t = np.linspace(0, duration, total_samples, False)
-    if genre == "HEAVY_ROCK":
-        # Distortion Bass
-        synth = np.sign(np.sin(2*np.pi*55*t)) * 0.1
-    elif genre == "TRAP_HH":
-        # Sub Bass Sine
-        synth = np.sin(2*np.pi*40*t) * 0.3
     else:
-        # Smooth Chord
-        synth = (np.sin(2*np.pi*261*t) + np.sin(2*np.pi*329*t)) * 0.1
+        print("✅ ดึงกุญแจสำเร็จ! พร้อมทำงาน")
+
+    # เปลี่ยนหัวข้อเพลงตรงนี้ได้ครับ
+    topic = "อยู่นิ่งๆ ไม่เจ็บตัว"
+    print(f"\n🎵 กำลังแต่งเพลงเรื่อง: {topic}")
+
+    # สั่งทำงาน
+    lyrics = generate_lyrics(topic, MY_API_KEY)
+    
+    if lyrics:
+        print(f"\n--- เนื้อเพลง ---\n{lyrics}\n-----------------")
         
-    final_mix = output + synth
-    
-    # Normalize
-    max_val = np.max(np.abs(final_mix))
-    if max_val > 0: final_mix /= max_val
-    
-    # Export
-    virtual_file = io.BytesIO()
-    write(virtual_file, fs, (final_mix * 32767 * 0.8).astype(np.int16))
-    return virtual_file, bpm
-
-# ---------------------------------------------------------
-# 3. INTERFACE (DISPLAY)
-# ---------------------------------------------------------
-st.markdown('<div class="sys-header">/// SYSTEM_AUDIO_GATEWAY_V.1</div>', unsafe_allow_html=True)
-
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    st.write("INPUT_PARAMETERS:")
-    genre_input = st.selectbox("", ["TRAP_HH", "SOUL_RB", "HEAVY_ROCK"], label_visibility="collapsed")
-    
-    st.write("TIME_FRAME (SEC):")
-    duration_input = st.slider("", 5, 20, 10, label_visibility="collapsed")
-    
-    st.markdown("---")
-    
-    # ปุ่มกดแบบดิบๆ
-    if st.button("> EXECUTE_SEQUENCE"):
-        with st.spinner("PROCESSING_WAVEFORMS..."):
-            audio_data, bpm_out = generate_track(genre_input, duration_input)
-            
-            st.success("RENDER_COMPLETE.")
-            
-            # โชว์เครื่องเล่น
-            st.markdown("OUTPUT_CHANNEL_01:")
-            st.audio(audio_data, format='audio/wav')
-            
-            # เก็บค่าไว้แสดงผล Log
-            st.session_state['log'] = f"""
-            > TARGET: {genre_input}
-            > BPM: {bpm_out}
-            > BUFFER: {duration_input}s
-            > STATUS: EXPORTED
-            """
-
-with col2:
-    st.write("SYSTEM_LOG:")
-    # ส่วนแสดงผลแบบ Code Terminal
-    log_text = st.session_state.get('log', "> WAITING_FOR_COMMAND...")
-    st.markdown(f"""
-    <div class="terminal-box">
-    ROOT@SERVER:~$ ./init_audio_engine<br>
-    [OK] LIBRARIES LOADED<br>
-    [OK] DRIVER: VIRTUAL_DAC<br>
-    ---------------------------------<br>
-    {log_text.replace(chr(10), '<br>')}
-    <br>
-    <span style="animation: blink 1s infinite;">_</span>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # กราฟิกคลื่นเสียงแบบเส้นเดียว (Minimal)
-    st.write("")
-    st.write("VISUAL_MONITOR:")
-    chart_data = [random.random() for _ in range(50)]
-    st.area_chart(chart_data, color="#333333")
-
+        print("🔊 กำลังสร้างไฟล์เสียง...")
+        if generate_audio(lyrics, "my_song.wav", MY_API_KEY):
+            print("✅ เรียบร้อย! ไฟล์เสียงชื่อ 'my_song.wav' มาแล้วครับ")
+        else:
+            print("❌ สร้างเสียงไม่สำเร็จ")
+    else:
+        print("❌ แต่งเพลงไม่สำเร็จ")
