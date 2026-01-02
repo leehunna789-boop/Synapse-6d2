@@ -4,6 +4,28 @@ import io
 from scipy.io.wavfile import write
 import random
 
+# ... (ฟังก์ชัน pcm_to_wav, request_with_retry, call_gemini_ai เหมือนเดิม) ...
+# ... (ฟังก์ชัน call_gemini_tts เหมือนเดิม) ...
+
+# --- ส่วนเรียกใช้งาน ---
+if __name__ == "__main__":
+    
+    # 2. แก้บรรทัดนี้ เพื่อดึง Key มาจากที่เก็บครับ
+    # เปลี่ยน "ชื่อ_KEY_ของคุณ" เป็นชื่อที่คุณตั้งไว้ในระบบ (เช่น 'GEMINI_API_KEY')
+    MY_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+    # เช็คว่าดึงมาได้ไหม (กันพลาด)
+    if not MY_API_KEY:
+        print("Error: ไม่พบ API Key! กรุณาตรวจสอบว่าตั้งค่า Environment Variable แล้ว")
+        exit()
+
+    # --- รันคำสั่งปกติ ---
+    concept = "อยู่นิ่งๆ ไม่เจ็บตัว"
+    print(f"กำลังแต่งเพลงเกี่ยวกับ: {concept} ...")
+    
+    prompt = f"แต่งเนื้อเพลงสั้นๆ เกี่ยวกับ: {concept} เป็นภาษาไทย ขอสั้นๆ 4 บรรทัดพอ"
+    lyrics = call_gemini_ai(prompt, MY_API_KEY)
+    
 # ---------------------------------------------------------
 # 1. UI CONFIGURATION (DARK & RAW MODE)
 # ---------------------------------------------------------
