@@ -1,13 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
-import pyworld as pw
+import pyworld as pw  # ใช้ pw สำหรับ pyworld
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
-import matplotlib#
+import matplotlib # นำเข้าเพื่อตั้งค่า Backend
 
-# ตั้งค่า Matplotlib ให้รันบน Server ได้ (Agg mode)
-matplotlib.use('Agg')
+# ตั้งค่า Matplotlib ให้รันบน Server ได้ (ใช้ชื่อ matplotlib ตรงๆ)
+matplotlib.use('Agg') 
 
 # 1. ตั้งค่าความปลอดภัยเรียกใช้กุญแจจาก Secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
