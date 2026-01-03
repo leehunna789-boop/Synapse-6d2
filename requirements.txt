@@ -4,6 +4,5 @@ slack_sdk
 numpy
 scipy
 gTTS
-scipy
-pyworld
-setuptools
+streamlit
+google-generativeai
