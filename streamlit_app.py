@@ -5,6 +5,29 @@ import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
 import matplotlib # นำเข้าเพื่อตั้งค่า Backend
+Python
+# 3. ส่วนการรันระบบ (Execution Logic)
+def run_composition_engine(user_prompt):
+    # สั่งให้ Gemini แต่งเนื้อเพลงและคอร์ด
+    response = model.generate_content(f"แต่งเพลงเกี่ยวกับ: {user_prompt}")
+    lyrics_and_chords = response.text
+    print("--- Lyrics and Chords Generated ---")
+    print(lyrics_and_chords)
+# สมมติว่ามีไฟล์เสียงต้นแบบ (Template) สำหรับใส่เสียงร้อง
+    input_audio_path = "template_vocal.wav" 
+    
+    # เรียกใช้ฟังก์ชันที่คุณเขียนไว้ในรูป (Synapse Vocal Engine)
+    # หมายเหตุ: ต้องส่งค่าพารามิเตอร์ให้ครบตามที่ฟังก์ชันต้องการ
+    output_audio = synapse_vocal_engine(input_audio_path) 
+    
+    # 4. บันทึกผลลัพธ์เป็นไฟล์เสียงจริง
+    sf.write('generated_song.wav', output_audio, 44100)
+    print("Successfully! เพลงของคุณถูกสร้างแล้วในไฟล์ generated_song.wav")
+# สั่งเริ่มทำงาน
+if __name__ == "__main__":
+    run_composition_engine("การขับเคลื่อนสู่อนาคต")
+
+
 
 # ตั้งค่า Matplotlib ให้รันบน Server ได้ (ใช้ชื่อ matplotlib ตรงๆ)
 matplotlib.use('Agg') 
@@ -17,10 +40,10 @@ instruction = (
     "คุณคือนักแต่งเพลงมืออาชีพ สโลแกนคือ 'อยู่นิ่งๆ ไม่เจ็บตัว' "
     "กฎ: ต้องระบุคอร์ดเหนือเนื้อเพลง และวิเคราะห์คำศัพท์ตอนท้ายเสมอ"
 )
+
 model = genai.GenerativeModel(
     model_name='gemini-1.5-flash', 
     system_instruction=instruction
-)
 
 # 2. ฟังก์ชันหลักสำหรับวิเคราะห์และสังเคราะห์เสียงร้อง (Matrix V1)
 def synapse_vocal_engine(input_audio, fs, valence):
@@ -80,6 +103,8 @@ if st.button("GENERATE & HEAL"):
         
         st.pyplot(fig) # แสดงผลผ่าน Agg mode
         
-        # เล่นเสียง
+        # เล่นเสียงif __name__ == "__main__":
+    # สั่งให้ฟังก์ชันที่คุณเขียนไว้เริ่มทำงาน
+    # (อย่าลืมเปลี่ยนชื่อไฟล์ในวงเล็บให้ตรงกับ")
         st.audio(output_path)
         st.success("บำบัดสำเร็จ! ข้อมูลถูกบันทึกลง Story List แล้ว")
