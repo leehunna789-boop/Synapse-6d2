@@ -103,8 +103,8 @@ if st.button("GENERATE & HEAL"):
         
         st.pyplot(fig) # แสดงผลผ่าน Agg mode
         
-        # เล่นเสียงif __name__ == "__main__":
+    
+        st.audio(output_path)เล่นเสียงif __name__ == "__main__":
     # สั่งให้ฟังก์ชันที่คุณเขียนไว้เริ่มทำงาน
-    # (อย่าลืมเปลี่ยนชื่อไฟล์ในวงเล็บให้ตรงกับ")
-        st.audio(output_path)
+    # (อย่าลื
         st.success("บำบัดสำเร็จ! ข้อมูลถูกบันทึกลง Story List แล้ว")
