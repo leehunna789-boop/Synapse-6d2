@@ -1,110 +1,89 @@
 import streamlit as st
 import google.generativeai as genai
-import pyworld as pw  # ใช้ pw สำหรับ pyworld
+import pyworld as pw
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
-import matplotlib # นำเข้าเพื่อตั้งค่า Backend
-Python
-# 3. ส่วนการรันระบบ (Execution Logic)
-def run_composition_engine(user_prompt):
-    # สั่งให้ Gemini แต่งเนื้อเพลงและคอร์ด
-    response = model.generate_content(f"แต่งเพลงเกี่ยวกับ: {user_prompt}")
-    lyrics_and_chords = response.text
-    print("--- Lyrics and Chords Generated ---")
-    print(lyrics_and_chords)
-# สมมติว่ามีไฟล์เสียงต้นแบบ (Template) สำหรับใส่เสียงร้อง
-    input_audio_path = "template_vocal.wav" 
-    
-    # เรียกใช้ฟังก์ชันที่คุณเขียนไว้ในรูป (Synapse Vocal Engine)
-    # หมายเหตุ: ต้องส่งค่าพารามิเตอร์ให้ครบตามที่ฟังก์ชันต้องการ
-    output_audio = synapse_vocal_engine(input_audio_path) 
-    
-    # 4. บันทึกผลลัพธ์เป็นไฟล์เสียงจริง
-    sf.write('generated_song.wav', output_audio, 44100)
-    print("Successfully! เพลงของคุณถูกสร้างแล้วในไฟล์ generated_song.wav")
-# สั่งเริ่มทำงาน
-if __name__ == "__main__":
-    run_composition_engine("การขับเคลื่อนสู่อนาคต")
+import matplotlib
 
-
-
-# ตั้งค่า Matplotlib ให้รันบน Server ได้ (ใช้ชื่อ matplotlib ตรงๆ)
+# --- [ส่วนที่ 1: ตั้งค่าระบบ] ---
 matplotlib.use('Agg') 
 
-# 1. ตั้งค่าความปลอดภัยเรียกใช้กุญแจจาก Secrets
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# ต้องวาง st.set_page_config ไว้บนสุดของส่วนแสดงผล
+st.set_page_config(page_title="SYNAPSE", page_icon="🌐")
 
-# กำหนด System Instruction ตามบทบาทนักแต่งเพลงของคุณ
+# วางโลโก้ (ตรวจสอบว่ามีไฟล์ logo.jpg ในโฟลเดอร์เดียวกับโค้ด)
+try:
+    st.image("logo.jpg", width=200)
+except:
+    st.warning("ไม่พบไฟล์ logo.jpg กรุณาตรวจสอบตำแหน่งไฟล์")
+
+# ตั้งค่า API Key
+if "GEMINI_API_KEY" in st.secrets:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("กรุณาใส่ API Key ใน Secrets")
+
+# --- [ส่วนที่ 2: ตั้งค่าโมเดล Gemini] ---
 instruction = (
     "คุณคือนักแต่งเพลงมืออาชีพ สโลแกนคือ 'อยู่นิ่งๆ ไม่เจ็บตัว' "
     "กฎ: ต้องระบุคอร์ดเหนือเนื้อเพลง และวิเคราะห์คำศัพท์ตอนท้ายเสมอ"
 )
 
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash', 
+    model_name='gemini-1.5-flash',
     system_instruction=instruction
+) # <--- ปิดวงเล็บให้ถูกต้องตรงนี้
 
-# 2. ฟังก์ชันหลักสำหรับวิเคราะห์และสังเคราะห์เสียงร้อง (Matrix V1)
+# --- [ส่วนที่ 3: ฟังก์ชันการประมวลผลเสียง (Synapse Engine)] ---
 def synapse_vocal_engine(input_audio, fs, valence):
-    # วิเคราะห์เสียงต้นแบบ (Analysis)
-    # ใช้ High-level API ตามที่คุณระบุ
-    f0, sp, ap = pw.wav2world(input_audio, fs)
-    
-    # ขยี้อารมณ์ด้วย Matrix V1 (Pitch Control)
-    # ปรับ f0 ตามค่าความสุข/เศร้า (Valence)
-    # ตัวอย่าง: ถ้าเศร้า f0 จะต่ำลง
+    x = input_audio.astype(np.float64)
+    # Analysis
+    f0, sp, ap = pw.wav2world(x, fs)
+    # Pitch Control (มิติของอารมณ์)
     modified_f0 = f0 * (0.8 + (valence * 0.4))
-    
-    # สังเคราะห์กลับเป็นเสียงใหม่ (Synthesis)
+    # Synthesis
     y = pw.synthesize(modified_f0, sp, ap, fs)
     return y, modified_f0, sp
 
-# 3. ส่วนการแสดงผลบนหน้าจอ (UI)
-st.set_page_config(page_title="SYNAPSE", logo.jpg=" ")
+# --- [ส่วนที่ 4: ส่วนแสดงผลหน้าจอ UI] ---
 st.title("🌐 SYNAPSE: Sound & Visual Therapy")
-st.caption("Slogan: อยู่นิ่งๆ ไม่เจ็บตัว (Stay Still & Heal)") #
+st.caption("Slogan: อยู่นิ่งๆ ไม่เจ็บตัว (Stay Still & Heal)")
 
-# ช่องรับ Input
 user_note = st.text_input("ใจความสั้นๆ ที่จะให้ AI ขยี้...", placeholder="เช่น ความเหงาในเมืองใหญ่")
 
 if st.button("GENERATE & HEAL"):
-    with st.spinner('AI กำลังขยี้ใจความและสังเคราะห์เสียงบำบัด...'):
-        # --- ส่วนของ Gemini ---
-        response = model.generate_content(user_note)
-        st.subheader("🎵 Lyrics & Chords")
-        st.write(response.text) #
-        
-        # --- ส่วนของ PyWorld (จำลองเสียงต้นแบบ) ---
-        # ในการใช้งานจริงควรใช้ไฟล์เสียงร้องที่คุณเตรียมไว้
-        fs = 44100
-        t = np.linspace(0, 2, fs * 2)
-        x = np.sin(2 * np.pi * 440 * t).astype(np.float64) # Dummy input
-        
-        # สมมติค่า Valence จากเนื้อหา (0.0 - 1.0)
-        mood_valence = 0.3 if "เหงา" in user_note or "เศร้า" in user_note else 0.7
-        
-        # รันเครื่องยนต์เสียง
-        y, f0_new, sp_new = synapse_vocal_engine(x, fs, mood_valence)
-        
-        # บันทึกไฟล์เสียง
-        output_path = "syntinsefs.wav"
-        sf.write(output_path, y, fs)
-        
-        # --- ส่วนการแสดงผลกราฟ (Visual Therapy) ---
-        st.subheader("📊 Visual Matrix Analysis")
-        fig, ax = plt.subplots(2, 1, figsize=(10, 6))
-        
-        ax[0].plot(f0_new, color='#FF0000') # สีแดงตามธีมคุณ
-        ax[0].set_title('Pitch Contour (f0)')
-        
-        ax[1].imshow(np.log(sp_new).T, aspect='auto', origin='lower', cmap='magma')
-        ax[1].set_title('Spectral Envelope (Voice Identity)')
-        
-        st.pyplot(fig) # แสดงผลผ่าน Agg mode
-        
-    
-        st.audio(output_path)เล่นเสียงif __name__ == "__main__":
-    # สั่งให้ฟังก์ชันที่คุณเขียนไว้เริ่มทำงาน
-    # (อย่าลื
-        st.success("บำบัดสำเร็จ! ข้อมูลถูกบันทึกลง Story List แล้ว")
+    if user_note:
+        with st.spinner('กำลังประมวลผล...'):
+            # 1. ให้ Gemini แต่งเพลง
+            response = model.generate_content(user_note)
+            st.subheader("🎵 Lyrics & Chords")
+            st.write(response.text)
+
+            # 2. สร้างเสียงจำลอง (Simulation)
+            fs = 44100
+            t = np.linspace(0, 2, fs * 2)
+            x = 0.5 * np.sin(2 * np.pi * 440 * t) # เสียง Sine wave พื้นฐาน
+            
+            # วิเคราะห์อารมณ์เบื้องต้น
+            mood_valence = 0.3 if "เหงา" in user_note or "เศร้า" in user_note else 0.7
+            
+            # 3. รัน Engine เสียง
+            y, f0_new, sp_new = synapse_vocal_engine(x, fs, mood_valence)
+            
+            # 4. บันทึกและแสดงผล
+            output_path = "synapse_output.wav"
+            sf.write(output_path, y, fs)
+            
+            # วาดกราฟ Visual Therapy
+            fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+            ax[0].plot(f0_new, color='red')
+            ax[0].set_title("Pitch Dimension")
+            ax[1].imshow(np.log(sp_new).T, aspect='auto', origin='lower', cmap='magma')
+            ax[1].set_title("Spectral Dimension")
+            st.pyplot(fig)
+
+            st.audio(output_path)
+            st.success("บำบัดสำเร็จ! อยู่นิ่งๆ และฟังเสียงนี้นะครับ")
+    else:
+        st.warning("กรุณาพิมพ์ข้อความก่อนกดปุ่ม")
