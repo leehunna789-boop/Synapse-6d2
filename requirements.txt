@@ -6,3 +6,4 @@ scipy
 gTTS
 pyworld
 setuptools
+soundfile
