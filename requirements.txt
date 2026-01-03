@@ -1,9 +1,8 @@
-pyworld
-
-
-numpy
 streamlit
 google-generativeai
 slack_sdk
+numpy
 scipy
 gTTS
+pyworld
+setuptools
