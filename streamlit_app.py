@@ -61,7 +61,7 @@ def synapse_vocal_engine(input_audio, fs, valence):
     return y, modified_f0, sp
 
 # 3. ส่วนการแสดงผลบนหน้าจอ (UI)
-st.set_page_config(page_title="SYNAPSE", page_icon="🌐")
+st.set_page_config(page_title="SYNAPSE", logo.jpg=" ")
 st.title("🌐 SYNAPSE: Sound & Visual Therapy")
 st.caption("Slogan: อยู่นิ่งๆ ไม่เจ็บตัว (Stay Still & Heal)") #
 
