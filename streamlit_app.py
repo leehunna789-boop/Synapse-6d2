@@ -4,7 +4,7 @@ import pyworld as pw
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
-import matplotlib as pw
+import matplotlib as pw#
 
 # ตั้งค่า Matplotlib ให้รันบน Server ได้ (Agg mode)
 matplotlib.use('Agg')
