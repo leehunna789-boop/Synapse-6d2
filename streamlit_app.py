@@ -7,103 +7,81 @@ import re
 import matplotlib.pyplot as plt
 import matplotlib
 
-# --- [ส่วนที่ 1: เตรียมระบบ (Setup)] ---
-matplotlib.use('Agg') # ตั้งค่ากราฟไม่ให้ตีกับ Server
-st.set_page_config(page_title="SYNAPSE: FINAL REAL", page_icon="🧬")
+# --- [ตั้งค่า] ---
+matplotlib.use('Agg')
+st.set_page_config(page_title="SYNAPSE: X-RAY", page_icon="🔍")
 
-# เช็คกุญแจ (ถ้าไม่มี Key โค้ดนี้เป็นแค่เศษกระดาษ)
 if "GEMINI_API_KEY" not in st.secrets:
-    st.error("⛔ CRITICAL: ไม่พบ API Key ใน Settings")
+    st.error("⛔ ใส่ Key ก่อนครับ")
     st.stop()
 
-# เชื่อมต่อกับสมอง AI
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 
-# --- [ส่วนที่ 2: สร้างเครื่องยนต์ (Define Engine)] ---
-# นี่คือคำสั่ง def ที่คุณถามหา (สร้างเครื่องรอไว้)
+# --- [เครื่องยนต์สร้างเสียง] ---
 def real_ai_engine(duration, fs, params):
     t = np.linspace(0, duration, int(fs * duration))
+    # รับค่าจาก AI
+    freq = params.get('frequency', 174)
+    beat = params.get('binaural_beat', 6)
     
-    # [จุดตรวจสอบความจริง]: รับค่าจาก params เท่านั้น (ไม่มีการกำหนดเลขเอง)
-    freq = params.get('frequency', 174)      # <--- รับความถี่จาก AI
-    beat = params.get('binaural_beat', 6)    # <--- รับจังหวะจาก AI
-    speed = params.get('breath_speed', 0.2)  # <--- รับความเร็วหายใจจาก AI
-    
-    # สร้างคลื่นเสียง (Physics Logic)
+    # สร้างเสียง
     left = 0.5 * np.sin(2 * np.pi * freq * t)
     right = 0.5 * np.sin(2 * np.pi * (freq + beat) * t)
     
-    # Effect การหายใจ (Modulation)
-    lfo = 0.5 + 0.5 * np.sin(2 * np.pi * speed * t)
-    
-    # รวมเสียงซ้ายขวา
-    audio = np.vstack((left*lfo, right*lfo)).T * 0.5
-    return audio, freq, lfo
+    return np.vstack((left, right)).T * 0.5, freq
 
-# --- [ส่วนที่ 3: หน้าจอสั่งงาน (User Interface)] ---
-st.title("🧬 SYNAPSE: AI-Core Integration")
-st.caption("Status: Ready to Link Logic & Sound")
+# --- [หน้าจอ X-RAY] ---
+st.title("🔍 SYNAPSE: X-Ray Mode")
+st.caption("เปิดเผยการทำงานทุกขั้นตอน (จะได้รู้ว่าไม่ปลอม)")
 
-user_input = st.text_input("ระบุความรู้สึก (Input Signal):")
+user_input = st.text_input("พิมพ์ความรู้สึก (เพื่อดูสมอง AI ทำงาน):")
 
-# --- [ส่วนที่ 4: สวิตช์เริ่มทำงาน (Execution Trigger)] ---
-# นี่คือคำสั่ง if st.button ที่สั่งให้เริ่มระบบ
-if st.button("START PROCESS"):
-    if not user_input:
-        st.warning("กรุณาป้อนข้อมูลก่อนสตาร์ทเครื่อง")
-    else:
-        with st.status("⚙️ Executing Neural Protocol...", expanded=True):
+if st.button("START X-RAY"):
+    if user_input:
+        with st.status("กำลังผ่าตัดระบบดูไส้ใน...", expanded=True):
             
-            # A. สั่งงาน AI (Prompting)
-            st.write("1. Sending signal to Gemini...")
+            # 1. ขั้นตอนส่งคำสั่ง
+            st.write("---")
+            st.info("1. ส่งคำสั่งไป Google (Prompt):")
+            st.code(f'Analyze: "{user_input}" -> Return JSON Physics')
+            
+            # 2. ขั้นตอนรับความคิด AI
             prompt = f"""
             Analyze emotion: "{user_input}"
-            Return a JSON object ONLY with these parameters:
+            Return ONLY a JSON object:
             {{
-                "frequency": (float 100-600, e.g. 174 for pain, 528 for love),
+                "frequency": (float 100-600),
                 "binaural_beat": (float 1-10),
-                "breath_speed": (float 0.1-1.0),
-                "message": (Thai quote ending with "อยู่นิ่งๆ ไม่เจ็บตัว")
+                "message": (Thai short quote)
             }}
             """
+            response = model.generate_content(prompt)
             
-            try:
-                # B. รับผลและแปลภาษา (Listening & Parsing)
-                response = model.generate_content(prompt)
+            # 3. โชว์ของดิบ (Raw Output) ** นี่คือสิ่งที่พี่ไม่เคยเห็น **
+            st.write("---")
+            st.info("2. สิ่งที่ AI ตอบกลับมา (Raw Data):")
+            st.text(response.text) # <--- โชว์ข้อความดิบๆ จาก AI เลย
+            
+            # 4. แปลงเป็นตัวเลข
+            match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if match:
+                ai_data = json.loads(match.group())
                 
-                # นี่คือคำสั่ง json.loads ที่ใช้แกะกล่องของขวัญ
-                match = re.search(r'\{.*\}', response.text, re.DOTALL)
-                ai_data = json.loads(match.group()) 
+                st.write("---")
+                st.info(f"3. แปลงเป็นตัวเลขสำหรับเครื่องจักร:")
+                # โชว์ให้เห็นจะๆ ว่าเลขนี้มาจาก AI
+                col1, col2 = st.columns(2)
+                col1.metric("Frequency (Hz)", ai_data['frequency'])
+                col2.metric("Binaural Beat (Hz)", ai_data['binaural_beat'])
                 
-                st.success("2. AI Data Decoded:")
-                st.json(ai_data) # <--- โชว์หลักฐานว่า AI ส่งเลขอะไรมา
+                # 5. สร้างเสียงจากเลขข้างบน
+                y, f = real_ai_engine(60, 44100, ai_data)
+                sf.write("xray.wav", y, 44100)
                 
-                # C. [จุดเชื่อมต่อสำคัญ] (Connection Point)
-                # เอา "น้ำมัน" (ai_data) เติมเข้า "เครื่องยนต์" (real_ai_engine)
-                st.write("3. Synthesizing Audio Waves...")
-                y, val_freq, val_lfo = real_ai_engine(60, 44100, ai_data)
-                
-                # บันทึกไฟล์
-                sf.write("synapse_real.wav", y, 44100)
-                
-                # D. แสดงผล (Output)
-                st.divider()
-                
-                # วาดกราฟพิสูจน์
-                fig, ax = plt.subplots(2, 1, figsize=(8, 5), facecolor='#0e1117')
-                ax[0].plot(val_lfo[:500], color='#00ff00') # กราฟการหายใจ
-                ax[0].set_title("AI-Controlled Breathing LFO", color='white')
-                ax[0].set_facecolor('#0e1117')
-                
-                ax[1].axhline(y=val_freq, color='#ff00ff', linewidth=3) # กราฟความถี่
-                ax[1].set_title(f"Target Frequency: {val_freq} Hz", color='white')
-                ax[1].set_facecolor('#0e1117')
-                st.pyplot(fig)
-                
-                # เล่นเสียงและโชว์ข้อความ
-                st.audio("synapse_real.wav")
-                st.info(f"💬 {ai_data['message']}")
-                
-            except Exception as e:
-                st.error(f"❌ System Error: {e}")
+                st.write("---")
+                st.success("4. ผลลัพธ์สุดท้าย (เสียง + ข้อความ):")
+                st.audio("xray.wav")
+                st.write(f"💬 {ai_data['message']}")
+            else:
+                st.error("AI ตอบมาผิดรูปแบบ")
