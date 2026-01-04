@@ -4,84 +4,101 @@ import numpy as np
 import soundfile as sf
 import json
 import re
-import matplotlib.pyplot as plt
-import matplotlib
+from scipy import signal # เพิ่มไลบรารีสร้างคลื่นเสียงแปลกๆ
 
-# --- [ตั้งค่า] ---
-matplotlib.use('Agg')
-st.set_page_config(page_title="SYNAPSE: X-RAY", page_icon="🔍")
+st.set_page_config(page_title="SYNAPSE: DYNAMIC", page_icon="🎛️")
 
 if "GEMINI_API_KEY" not in st.secrets:
-    st.error("⛔ ใส่ Key ก่อนครับ")
+    st.error("⛔ ไม่พบ API Key")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-pro')
 
-# --- [เครื่องยนต์สร้างเสียง] ---
-def real_ai_engine(duration, fs, params):
+# --- [ค้นหาโมเดลอัตโนมัติ] ---
+@st.cache_resource
+def get_model():
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            if 'gemini' in m.name: return m.name
+    return "models/gemini-pro"
+
+model_name = get_model()
+model = genai.GenerativeModel(model_name)
+
+# --- [ENGINE ใหม่: เปลี่ยนเนื้อเสียงได้ (Timbre Control)] ---
+def dynamic_engine(duration, fs, params):
     t = np.linspace(0, duration, int(fs * duration))
-    # รับค่าจาก AI
     freq = params.get('frequency', 174)
     beat = params.get('binaural_beat', 6)
+    wave_type = params.get('waveform', 'sine') # <--- รับค่าชนิดเสียงจาก AI
     
-    # สร้างเสียง
-    left = 0.5 * np.sin(2 * np.pi * freq * t)
-    right = 0.5 * np.sin(2 * np.pi * (freq + beat) * t)
+    # ฟังก์ชันสร้างคลื่นตามคำสั่ง AI
+    def generate_wave(f, type):
+        if type == 'saw': 
+            return signal.sawtooth(2 * np.pi * f * t) # เสียงแตก (Industrial)
+        elif type == 'square':
+            return signal.square(2 * np.pi * f * t)   # เสียงหุ่นยนต์ (Retro)
+        else:
+            return np.sin(2 * np.pi * f * t)          # เสียงนุ่ม (Pure)
+
+    # สร้างเสียงซ้ายขวา
+    left = 0.5 * generate_wave(freq, wave_type)
+    right = 0.5 * generate_wave(freq + beat, wave_type)
     
-    return np.vstack((left, right)).T * 0.5, freq
+    # Effect หายใจ (LFO)
+    lfo = 0.5 + 0.5 * np.sin(2 * np.pi * 0.2 * t)
+    
+    return np.vstack((left*lfo, right*lfo)).T * 0.3 # ลดเสียงลงนิดนึงกันลำโพงแตก
 
-# --- [หน้าจอ X-RAY] ---
-st.title("🔍 SYNAPSE: X-Ray Mode")
-st.caption("เปิดเผยการทำงานทุกขั้นตอน (จะได้รู้ว่าไม่ปลอม)")
+# --- [UI] ---
+st.title(f"🎛️ SYNAPSE: Texture Change")
+st.caption(f"Connected to: {model_name}")
 
-user_input = st.text_input("พิมพ์ความรู้สึก (เพื่อดูสมอง AI ทำงาน):")
+user_input = st.text_input("พิมพ์อารมณ์ของคุณ (เช่น: เกลียด, รัก, ว่างเปล่า):")
 
-if st.button("START X-RAY"):
+if st.button("EXECUTE"):
     if user_input:
-        with st.status("กำลังผ่าตัดระบบดูไส้ใน...", expanded=True):
-            
-            # 1. ขั้นตอนส่งคำสั่ง
-            st.write("---")
-            st.info("1. ส่งคำสั่งไป Google (Prompt):")
-            st.code(f'Analyze: "{user_input}" -> Return JSON Physics')
-            
-            # 2. ขั้นตอนรับความคิด AI
-            prompt = f"""
-            Analyze emotion: "{user_input}"
-            Return ONLY a JSON object:
-            {{
-                "frequency": (float 100-600),
-                "binaural_beat": (float 1-10),
-                "message": (Thai short quote)
-            }}
-            """
-            response = model.generate_content(prompt)
-            
-            # 3. โชว์ของดิบ (Raw Output) ** นี่คือสิ่งที่พี่ไม่เคยเห็น **
-            st.write("---")
-            st.info("2. สิ่งที่ AI ตอบกลับมา (Raw Data):")
-            st.text(response.text) # <--- โชว์ข้อความดิบๆ จาก AI เลย
-            
-            # 4. แปลงเป็นตัวเลข
-            match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if match:
-                ai_data = json.loads(match.group())
+        with st.status("🧠 AI กำลังเลือกเครื่องดนตรี...", expanded=True):
+            try:
+                # Prompt ใหม่: สั่งให้เลือก waveform ด้วย
+                prompt = f"""
+                Analyze emotion: "{user_input}"
+                Return ONLY JSON with:
+                1. "frequency": (float 100-800)
+                2. "binaural_beat": (float 1-15)
+                3. "waveform": (string, choose one: "sine", "saw", "square")
+                   - Use "sine" for peace, sad, calm.
+                   - Use "saw" for anger, pain, energy, industrial.
+                   - Use "square" for confusion, robot, digital.
+                4. "message": (Thai quote)
+                """
                 
-                st.write("---")
-                st.info(f"3. แปลงเป็นตัวเลขสำหรับเครื่องจักร:")
-                # โชว์ให้เห็นจะๆ ว่าเลขนี้มาจาก AI
-                col1, col2 = st.columns(2)
-                col1.metric("Frequency (Hz)", ai_data['frequency'])
-                col2.metric("Binaural Beat (Hz)", ai_data['binaural_beat'])
+                response = model.generate_content(prompt)
                 
-                # 5. สร้างเสียงจากเลขข้างบน
-                y, f = real_ai_engine(60, 44100, ai_data)
-                sf.write("xray.wav", y, 44100)
-                
-                st.write("---")
-                st.success("4. ผลลัพธ์สุดท้าย (เสียง + ข้อความ):")
-                st.audio("xray.wav")
-                st.write(f"💬 {ai_data['message']}")
-            else:
-                st.error("AI ตอบมาผิดรูปแบบ")
+                match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                if match:
+                    ai_data = json.loads(match.group())
+                    
+                    # โชว์ให้เห็นเลยว่า AI เลือกเสียงแบบไหน
+                    st.write("---")
+                    c1, c2 = st.columns(2)
+                    c1.metric("Frequency", f"{ai_data['frequency']} Hz")
+                    c2.metric("Waveform Type", ai_data['waveform'].upper()) # <--- ดูตรงนี้
+                    
+                    if ai_data['waveform'] == 'sine':
+                        st.info("🌊 Selected: เสียงนุ่ม (Sine)")
+                    elif ai_data['waveform'] == 'saw':
+                        st.warning("⚡ Selected: เสียงแตก (Sawtooth)")
+                    else:
+                        st.success("🤖 Selected: เสียงดิจิตอล (Square)")
+
+                    # สร้างเสียง
+                    y = dynamic_engine(60, 44100, ai_data)
+                    sf.write("dynamic.wav", y, 44100)
+                    
+                    st.audio("dynamic.wav")
+                    st.write(f"💬 {ai_data['message']}")
+                else:
+                    st.error("AI ส่งข้อมูลผิดพลาด")
+            except Exception as e:
+                st.error(f"Error: {e}")
