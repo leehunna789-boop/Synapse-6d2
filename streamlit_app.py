@@ -29,29 +29,48 @@ model = genai.GenerativeModel(model_name='gemini-1.5-flash', system_instruction=
 
 # --- [ส่วนที่ 3: Engine เสียงใหม่ (ใช้ Numpy ล้วน ไม่ต้องใช้ pyworld)] ---
 def synapse_lite_engine(duration, fs, mood_valence):
-    # สร้างแกนเวลา
     t = np.linspace(0, duration, int(fs * duration))
     
-    # กำหนดความถี่พื้นฐาน (Base Frequency) ตามอารมณ์
-    # อารมณ์ดี (High Valence) = เสียงสูงขึ้นนิดหน่อย / เศร้า = เสียงทุ้มลึก
-    base_freq = 110 if mood_valence < 0.5 else 174 # Hz (Solfeggio Frequencies)
+    # 1. เทคนิค Solfeggio Frequencies (คลื่นเสียงบำบัดโบราณ)
+    # 174Hz = ลดความเจ็บปวด / 396Hz = ขจัดความกลัว
+    base_freq = 174 if mood_valence < 0.5 else 396
     
-    # สร้างคลื่นเสียง (Sine Wave) ผสมกับ (Binaural Beat)
-    # หูซ้าย
-    left_channel = 0.5 * np.sin(2 * np.pi * base_freq * t)
-    # หูขวา (เพี้ยนไปนิดหน่อยเพื่อให้สมองสร้างคลื่นบำบัด)
-    beat_freq = 6 # Theta waves (ผ่อนคลาย)
-    right_channel = 0.5 * np.sin(2 * np.pi * (base_freq + beat_freq) * t)
+    # 2. Additive Synthesis: สร้างเสียงให้หนาขึ้น ไม่แบนแต๊ดแต๋
+    # สร้าง 3 ชั้นเสียง: เบสต่ำ (Low), เสียงหลัก (Mid), เสียงแหลม (High)
+    layer_low  = 0.6 * np.sin(2 * np.pi * (base_freq * 0.5) * t) # เสียงเบสลึกๆ
+    layer_mid  = 0.4 * np.sin(2 * np.pi * base_freq * t)        # เสียงหลัก
+    layer_high = 0.1 * np.sin(2 * np.pi * (base_freq * 2.0) * t) # เสียงกังวาน
     
-    # รวมเป็น Stereo
-    audio_stereo = np.vstack((left_channel, right_channel)).T
-    
-    # สร้างข้อมูลหลอกๆ เพื่อไปวาดกราฟ (Mock Data)
-    f0_mock = np.ones_like(t) * base_freq + np.random.normal(0, 2, len(t))
-    sp_mock = np.abs(np.fft.rfft(left_channel[:1024])) # สุ่มวิเคราะห์ช่วงสั้นๆ
-    
-    return audio_stereo, f0_mock, sp_mock
+    # รวมชั้นเสียง
+    composite_wave = layer_low + layer_mid + layer_high
 
+    # 3. LFO Breathing (เทคนิคทำให้เสียง "หายใจ" ได้)
+    # ทำให้เสียงค่อยๆ ดัง-เบา ช้าๆ เหมือนชีพจร (จังหวะ 0.2 Hz)
+    breathing = 0.8 + 0.2 * np.sin(2 * np.pi * 0.2 * t)
+    composite_wave = composite_wave * breathing
+
+    # 4. Binaural Detuning (แยกประสาทหูซ้าย-ขวา)
+    # หูซ้าย: เสียงปกติ
+    left_channel = composite_wave
+    
+    # หูขวา: บิดคลื่นนิดหน่อยให้สมองงงและสร้างคลื่น Alpha/Theta เอง (ผ่อนคลาย)
+    beat_freq = 6 # Hz (Theta Wave)
+    # สร้างคลื่นหูขวาโดยขยับความถี่นิดเดียว
+    right_channel = (0.6 * np.sin(2 * np.pi * ((base_freq * 0.5) + beat_freq) * t)) + \
+                    (0.4 * np.sin(2 * np.pi * (base_freq + beat_freq) * t))
+    right_channel = right_channel * breathing
+
+    # 5. ใส่ "Noise" (เสียงซ่าๆ) เล็กน้อย ให้ดูเป็นแนว Industrial/Lo-fi
+    noise = np.random.normal(0, 0.01, len(t))
+    
+    # รวมร่าง
+    audio_stereo = np.vstack((left_channel + noise, right_channel + noise)).T
+    
+    # ข้อมูลสำหรับกราฟ (Visual)
+    f0_mock = base_freq + (breathing * 20) # กราฟเส้นจะขยับตามการหายใจ
+    sp_mock = np.abs(np.fft.rfft(left_channel[:2048])) 
+
+    return audio_stereo, f0_mock, sp_mock
 # --- [ส่วนที่ 4: UI] ---
 st.title("🌐 SYNAPSE: Lite Core")
 st.caption("Mode: Frequency Therapy (No Vocoder)")
