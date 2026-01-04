@@ -130,8 +130,4 @@ if st.button("INITIATE PROTOCOL"):
                 st.audio("neo.wav")
                 st.success(f"📟 {ai_data['message']}")
             else:
-                st.error("❌ DATA PARSING ERROR")
-                
-        except Exception as e:
-            st.error(f"⛔ ERROR: {e}")
-            st.info("💡 หมายเหตุ: ถ้าขึ้น Error 429 แปลว่าโควต้าวันนี้หมดนะครับ ต้องรอพรุ่งนี้หรือเปลี่ยน Key ใหม่")
+                st.google.generativeai ")
