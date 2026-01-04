@@ -2,123 +2,108 @@ import streamlit as st
 import google.generativeai as genai
 import numpy as np
 import soundfile as sf
+import json
+import re
 import matplotlib.pyplot as plt
 import matplotlib
 
-# --- [ส่วนที่ 1: ตั้งค่าระบบ] ---
-matplotlib.use('Agg')
-st.set_page_config(page_title="SYNAPSE", page_icon="🌐")
+# --- [ส่วนที่ 1: เตรียมระบบ (Setup)] ---
+matplotlib.use('Agg') # ตั้งค่ากราฟไม่ให้ตีกับ Server
+st.set_page_config(page_title="SYNAPSE: FINAL REAL", page_icon="🧬")
 
-# วางโลโก้
-try:
-    st.image("logo.jpg", width=200)
-except:
-    pass # ถ้าไม่มีโลโก้ก็ข้ามไป ไม่ต้องแจ้งเตือน
+# เช็คกุญแจ (ถ้าไม่มี Key โค้ดนี้เป็นแค่เศษกระดาษ)
+if "GEMINI_API_KEY" not in st.secrets:
+    st.error("⛔ CRITICAL: ไม่พบ API Key ใน Settings")
+    st.stop()
 
-# ตั้งค่า API Key
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# เชื่อมต่อกับสมอง AI
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- [ส่วนที่ 2: ตั้งค่าโมเดล Gemini] ---
-instruction = (
-    "คุณคือนักแต่งเพลง แนว Industrial/Dark Minimalist "
-    "สโลแกน: 'อยู่นิ่งๆ ไม่เจ็บตัว' "
-    "กฎ: แต่งเนื้อเพลงสั้นๆ 4 บรรทัด พร้อมคอร์ด และข้อความฮีลใจตอนท้าย"
-)
-model = genai.GenerativeModel(model_name='gemini-1.5-flash', system_instruction=instruction)
-
-# --- [ส่วนที่ 3: Engine เสียงใหม่ (ใช้ Numpy ล้วน ไม่ต้องใช้ pyworld)] ---
-def synapse_lite_engine(duration, fs, mood_valence):
+# --- [ส่วนที่ 2: สร้างเครื่องยนต์ (Define Engine)] ---
+# นี่คือคำสั่ง def ที่คุณถามหา (สร้างเครื่องรอไว้)
+def real_ai_engine(duration, fs, params):
     t = np.linspace(0, duration, int(fs * duration))
     
-    # 1. เทคนิค Solfeggio Frequencies (คลื่นเสียงบำบัดโบราณ)
-    # 174Hz = ลดความเจ็บปวด / 396Hz = ขจัดความกลัว
-    base_freq = 174 if mood_valence < 0.5 else 396
+    # [จุดตรวจสอบความจริง]: รับค่าจาก params เท่านั้น (ไม่มีการกำหนดเลขเอง)
+    freq = params.get('frequency', 174)      # <--- รับความถี่จาก AI
+    beat = params.get('binaural_beat', 6)    # <--- รับจังหวะจาก AI
+    speed = params.get('breath_speed', 0.2)  # <--- รับความเร็วหายใจจาก AI
     
-    # 2. Additive Synthesis: สร้างเสียงให้หนาขึ้น ไม่แบนแต๊ดแต๋
-    # สร้าง 3 ชั้นเสียง: เบสต่ำ (Low), เสียงหลัก (Mid), เสียงแหลม (High)
-    layer_low  = 0.6 * np.sin(2 * np.pi * (base_freq * 0.5) * t) # เสียงเบสลึกๆ
-    layer_mid  = 0.4 * np.sin(2 * np.pi * base_freq * t)        # เสียงหลัก
-    layer_high = 0.1 * np.sin(2 * np.pi * (base_freq * 2.0) * t) # เสียงกังวาน
+    # สร้างคลื่นเสียง (Physics Logic)
+    left = 0.5 * np.sin(2 * np.pi * freq * t)
+    right = 0.5 * np.sin(2 * np.pi * (freq + beat) * t)
     
-    # รวมชั้นเสียง
-    composite_wave = layer_low + layer_mid + layer_high
-
-    # 3. LFO Breathing (เทคนิคทำให้เสียง "หายใจ" ได้)
-    # ทำให้เสียงค่อยๆ ดัง-เบา ช้าๆ เหมือนชีพจร (จังหวะ 0.2 Hz)
-    breathing = 0.8 + 0.2 * np.sin(2 * np.pi * 0.2 * t)
-    composite_wave = composite_wave * breathing
-
-    # 4. Binaural Detuning (แยกประสาทหูซ้าย-ขวา)
-    # หูซ้าย: เสียงปกติ
-    left_channel = composite_wave
+    # Effect การหายใจ (Modulation)
+    lfo = 0.5 + 0.5 * np.sin(2 * np.pi * speed * t)
     
-    # หูขวา: บิดคลื่นนิดหน่อยให้สมองงงและสร้างคลื่น Alpha/Theta เอง (ผ่อนคลาย)
-    beat_freq = 6 # Hz (Theta Wave)
-    # สร้างคลื่นหูขวาโดยขยับความถี่นิดเดียว
-    right_channel = (0.6 * np.sin(2 * np.pi * ((base_freq * 0.5) + beat_freq) * t)) + \
-                    (0.4 * np.sin(2 * np.pi * (base_freq + beat_freq) * t))
-    right_channel = right_channel * breathing
+    # รวมเสียงซ้ายขวา
+    audio = np.vstack((left*lfo, right*lfo)).T * 0.5
+    return audio, freq, lfo
 
-    # 5. ใส่ "Noise" (เสียงซ่าๆ) เล็กน้อย ให้ดูเป็นแนว Industrial/Lo-fi
-    noise = np.random.normal(0, 0.01, len(t))
-    
-    # รวมร่าง
-    audio_stereo = np.vstack((left_channel + noise, right_channel + noise)).T
-    
-    # ข้อมูลสำหรับกราฟ (Visual)
-    f0_mock = base_freq + (breathing * 20) # กราฟเส้นจะขยับตามการหายใจ
-    sp_mock = np.abs(np.fft.rfft(left_channel[:2048])) 
+# --- [ส่วนที่ 3: หน้าจอสั่งงาน (User Interface)] ---
+st.title("🧬 SYNAPSE: AI-Core Integration")
+st.caption("Status: Ready to Link Logic & Sound")
 
-    return audio_stereo, f0_mock, sp_mock
-# --- [ส่วนที่ 4: UI] ---
-st.title("🌐 SYNAPSE: Lite Core")
-st.caption("Mode: Frequency Therapy (No Vocoder)")
+user_input = st.text_input("ระบุความรู้สึก (Input Signal):")
 
-user_note = st.text_input("ระบุสิ่งที่กวนใจคุณ...", placeholder="EXECUTE YOUR PAIN HERE...")
-
-if st.button("EXECUTE & HEAL"):
-    if user_note:
-        with st.spinner('Accessing Neural Network...'):
-            # 1. Gemini แต่งเพลง
-            try:
-                response = model.generate_content(user_note)
-                st.subheader("🎵 Text Output")
-                st.write(response.text)
-            except:
-                st.error("API Key มีปัญหา หรือเน็ตหลุด")
-
-            # 2. สร้างเสียงบำบัด
-            fs = 44100
-            duration = 10 # วินาที
-            mood = 0.3 if "เจ็บ" in user_note or "เศร้า" in user_note else 0.8
-            
-            y, f0, sp = synapse_lite_engine(duration, fs, mood)
-            
-            # 3. บันทึกและเล่น
-            output_path = "synapse_signal.wav"
-            sf.write(output_path, y, fs)
-            
-            # 4. แสดงผล
-            st.audio(output_path)
-            
-            # กราฟ
-            fig, ax = plt.subplots(2, 1, figsize=(10, 6), facecolor='#0e1117')
-            
-            # กราฟบน (Pitch)
-            ax[0].plot(f0[:1000], color='#00ff00', linewidth=1) # สีเขียว Terminal
-            ax[0].set_facecolor('#0e1117')
-            ax[0].set_title("Frequency Stability", color='white')
-            ax[0].tick_params(colors='white')
-            
-            # กราฟล่าง (Spectrum)
-            ax[1].plot(sp, color='#ff00ff', linewidth=1) # สีม่วง Neon
-            ax[1].set_facecolor('#0e1117')
-            ax[1].set_title("Energy Spectrum", color='white')
-            ax[1].tick_params(colors='white')
-            
-            st.pyplot(fig)
-            st.success("Process Complete. Stay Still.")
-            
+# --- [ส่วนที่ 4: สวิตช์เริ่มทำงาน (Execution Trigger)] ---
+# นี่คือคำสั่ง if st.button ที่สั่งให้เริ่มระบบ
+if st.button("START PROCESS"):
+    if not user_input:
+        st.warning("กรุณาป้อนข้อมูลก่อนสตาร์ทเครื่อง")
     else:
-        st.warning("Input required.")
+        with st.status("⚙️ Executing Neural Protocol...", expanded=True):
+            
+            # A. สั่งงาน AI (Prompting)
+            st.write("1. Sending signal to Gemini...")
+            prompt = f"""
+            Analyze emotion: "{user_input}"
+            Return a JSON object ONLY with these parameters:
+            {{
+                "frequency": (float 100-600, e.g. 174 for pain, 528 for love),
+                "binaural_beat": (float 1-10),
+                "breath_speed": (float 0.1-1.0),
+                "message": (Thai quote ending with "อยู่นิ่งๆ ไม่เจ็บตัว")
+            }}
+            """
+            
+            try:
+                # B. รับผลและแปลภาษา (Listening & Parsing)
+                response = model.generate_content(prompt)
+                
+                # นี่คือคำสั่ง json.loads ที่ใช้แกะกล่องของขวัญ
+                match = re.search(r'\{.*\}', response.text, re.DOTALL)
+                ai_data = json.loads(match.group()) 
+                
+                st.success("2. AI Data Decoded:")
+                st.json(ai_data) # <--- โชว์หลักฐานว่า AI ส่งเลขอะไรมา
+                
+                # C. [จุดเชื่อมต่อสำคัญ] (Connection Point)
+                # เอา "น้ำมัน" (ai_data) เติมเข้า "เครื่องยนต์" (real_ai_engine)
+                st.write("3. Synthesizing Audio Waves...")
+                y, val_freq, val_lfo = real_ai_engine(60, 44100, ai_data)
+                
+                # บันทึกไฟล์
+                sf.write("synapse_real.wav", y, 44100)
+                
+                # D. แสดงผล (Output)
+                st.divider()
+                
+                # วาดกราฟพิสูจน์
+                fig, ax = plt.subplots(2, 1, figsize=(8, 5), facecolor='#0e1117')
+                ax[0].plot(val_lfo[:500], color='#00ff00') # กราฟการหายใจ
+                ax[0].set_title("AI-Controlled Breathing LFO", color='white')
+                ax[0].set_facecolor('#0e1117')
+                
+                ax[1].axhline(y=val_freq, color='#ff00ff', linewidth=3) # กราฟความถี่
+                ax[1].set_title(f"Target Frequency: {val_freq} Hz", color='white')
+                ax[1].set_facecolor('#0e1117')
+                st.pyplot(fig)
+                
+                # เล่นเสียงและโชว์ข้อความ
+                st.audio("synapse_real.wav")
+                st.info(f"💬 {ai_data['message']}")
+                
+            except Exception as e:
+                st.error(f"❌ System Error: {e}")
