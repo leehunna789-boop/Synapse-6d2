@@ -4,7 +4,6 @@ slack_sdk
 numpy
 scipy
 gTTS
-pyworld
 setuptools
 soundfile
 matplotlib
