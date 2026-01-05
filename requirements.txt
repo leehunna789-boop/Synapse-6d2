@@ -7,3 +7,4 @@ gTTS
 setuptools
 soundfile
 matplotlib
+tkinter
