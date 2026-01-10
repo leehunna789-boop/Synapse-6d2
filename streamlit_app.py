@@ -1,110 +1,99 @@
 import streamlit as st
-import google.generativeai as genai
+import os
+import random
 
-# --- การตั้งค่าเบื้องต้น ---
+# --- 1. ตั้งค่าพื้นฐาน ---
 st.set_page_config(page_title="Synapse - อยู่นิ่งๆ ไม่เจ็บตัว", layout="wide")
 
-# ดึง API Key จาก Secrets
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-pro')
-except:
-    st.error("ไม่พบ API Key ในระบบ หรือ Key ไม่ถูกต้อง")
+# สร้างโฟลเดอร์เก็บเพลงถ้ายังไม่มี
+MUSIC_FOLDER = "your_music.mp3"
+if not os.path.exists(MUSIC_FOLDER):
+    os.makedirs(MUSIC_FOLDER)
 
-# --- ข้อ 7: ตกแต่งโทนสีเข้มจัด ---
+# --- 2. สไตล์สีเข้ม (ข้อ 7) ---
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #FFFFFF; }
-    .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; font-size: 18px; border: 2px solid #FFFFFF; }
-    /* สีพื้นหลังปุ่มตามโจทย์ */
-    div.stButton > button:first-child { background-color: #FF0000; color: white; } /* แดง */
+    .stButton>button { width: 100%; border-radius: 10px; font-weight: bold; border: 2px solid #FFFFFF; background-color: #1a1a1a; color: white; }
     h1, h2, h3, p { color: #FFFFFF !important; }
+    /* ปรับแต่งช่อง Upload */
+    .stFileUploader section { background-color: #111; border: 1px dashed #800080; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ข้อ 5: เครื่องเล่น MP3 เล่นวนตลอดเวลา ---
+# --- 3. Sidebar และเครื่องเล่นเพลง ---
+st.sidebar.title("📻 Synapse Player")
 st.sidebar.image("logo.jpg")
-st.sidebar.title("Synapse Player")
-st.sidebar.write("🎵 กำลังเล่นเพลงบำบัดอัตโนมัติ")
-try:
-    audio_file = open('your_music.mp3', 'rb') # เปลี่ยนชื่อไฟล์ให้ตรงกับที่คุณมี
-    audio_bytes = audio_file.read()
-    st.sidebar.audio(audio_bytes, format='audio/mp3', start_time=0, loop=True)
-except FileNotFoundError:
-    st.sidebar.warning("ไม่พบไฟล์ your_music.mp3 กรุณาตรวจสอบชื่อไฟล์")
 
-# --- ข้อ 6: ระบบจัดการหน้าจอ (4 หน้า) ---
-if 'page' not in st.session_state:
-    st.session_state.page = "หน้า 1"
+# ดึงรายชื่อเพลง
+def get_song_list():
+    return [f for f in os.listdir(MUSIC_FOLDER) if f.lower().endswith(('.mp3', '.wav'))]
 
-tab1, tab2, tab3, tab4 = st.tabs(["📝 ระบายใจ", "🎸 เลือกแนว", "🎶 รับบทเพลง", "💬 คุยกับ AI"])
+songs = get_song_list()
+if songs:
+    selected_song = st.sidebar.selectbox("เลือกเพลงบำบัด:", songs)
+    with open(os.path.join(MUSIC_FOLDER, selected_song), 'rb') as f:
+        st.sidebar.audio(f.read(), format='audio/mp3', loop=True)
+st.sidebar.write("สโลแกน: **อยู่นิ่งๆ ไม่เจ็บตัว**")
+
+# --- 4. เมนูหลัก 4 หน้า + หน้าจัดการเพลง ---
+if 'page' not in st.session_state: st.session_state.page = "หน้า 1"
+
+# เพิ่ม Tab "จัดการเพลง" เข้าไปเพื่อให้คุณอัปเดตเพลงได้หน้าแอปเลย
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 ระบายใจ", "🎸 เลือกแนว", "🎶 ผลงานเพลง", "💬 ปรับทุกข์", "📤 เพิ่มเพลง"])
+
+# --- หน้า 5: เพิ่มเพลง (ระบบที่คุณต้องการ) ---
+with tab5:
+    st.header("📤 ระบบอัปเดตเพลง (สำหรับคุณเท่านั้น)")
+    st.write("คุณสามารถอัปโหลดไฟล์ .mp3 เพิ่มเติมได้ที่นี่")
+    uploaded_files = st.file_uploader("เลือกไฟล์เพลงจากมือถือของคุณ", type=['mp3', 'wav'], accept_multiple_files=True)
+    
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            file_path = os.path.join(MUSIC_FOLDER, uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+        st.success(f"อัปโหลดเพลงเรียบร้อยแล้ว {len(uploaded_files)} เพลง! (กรุณารีเฟรชหน้าเว็บ)")
 
 # --- หน้า 1: ระบายความในใจ ---
 with tab1:
-    st.header("1. กระดานระบายความในใจ")
-    user_story = st.text_area("ปลดปล่อยความรู้สึกออกมาให้เต็มที่...", height=250, key="story_input")
+    st.header("1. ระบายความในใจ")
+    st.session_state.user_story = st.text_area("ปลดปล่อยความรู้สึกออกมา...", height=200)
     if st.button("พิมเสร็จแล้ว"):
-        st.session_state.user_story = user_story
-        st.success("บันทึกเรื่องราวแล้ว! กรุณากดไปที่หน้า 'เลือกแนว' ต่อไป")
+        st.success("บันทึกแล้ว ไปเลือกแนวเพลงต่อเลย")
 
 # --- หน้า 2: เลือกแนวเพลง ---
 with tab2:
-    st.header("2. เลือกแนวเพลงที่คุณชอบ")
-    genres = ["Pop", "Rock", "R&B", "Rap", "HipHop", "ลูกทุ่ง", "เพื่อชีวิต", "หมอลำ"]
-    cols = st.columns(4)
-    for i, genre in enumerate(genres):
-        if cols[i % 4].button(genre):
-            st.session_state.selected_genre = genre
-            st.balloons()
-            st.info(f"คุณเลือกแนว: {genre} เรียบร้อยแล้ว!")
+    st.header("2. เลือกแนวเพลง")
+    genres = ["Pop", "Rock", "R&B", "Rap", "Hiphop", "ลูกทุ่ง", "เพื่อชีวิต", "หมอลำ"]
+    cols = st.columns(2)
+    for i, g in enumerate(genres):
+        if cols[i%2].button(f"แนว {g}"):
+            st.session_state.genre = g
 
-# --- หน้า 3: แสดงผลลัพธ์ (AI อยู่นิ่งๆ ไม่เจ็บตัว) ---
+# --- หน้า 3: รับเนื้อเพลง (ระบบบังคับแชร์) ---
 with tab3:
-    st.header("3. บทเพลงจาก 'อยู่นิ่งๆ ไม่เจ็บตัว'")
-    if 'user_story' in st.session_state and 'selected_genre' in st.session_state:
-        if st.button("เริ่มแต่งเพลงบำบัด"):
-            with st.spinner("AI กำลังเรียบเรียงทำนองชีวิต..."):
-                prompt = f"""จงแปลงความในใจนี้: '{st.session_state.user_story}' 
-                ให้กลายเป็นบทเพลงแนว {st.session_state.selected_genre} 
-                โดยมีโครงสร้าง เนื้อเพลง พร้อมใส่คอร์ดกีตาร์และคีย์เพลงกำกับในทุกประโยค
-                ใช้สไตล์การเขียนแบบบำบัดจิตใจ ภายใต้คอนเซปต์ 'อยู่นิ่งๆ ไม่เจ็บตัว'"""
-                
-                response = model.generate_content(prompt)
-                st.session_state.generated_lyrics = response.text
-                
-        if 'generated_lyrics' in st.session_state:
-            st.text_area("เนื้อเพลงของคุณ:", value=st.session_state.generated_lyrics, height=400)
-            
-            # ข้อ 4: ระบบบังคับแชร์
-            st.warning("🔒 คุณต้องกดแชร์ก่อนจึงจะดาวน์โหลดได้")
-            col_like, col_share = st.columns(2)
-            col_like.button("👍 ถูกใจ / ติดตาม")
-            if col_share.button("📤 กดเพื่อแชร์"):
-                st.session_state.is_shared = True
-                st.success("ขอบคุณที่แชร์! ปลดล็อกปุ่มดาวน์โหลดแล้ว")
-            
-            if st.session_state.get('is_shared', False):
-                st.download_button("💾 ดาวน์โหลดข้อมูลเพลง", st.session_state.generated_lyrics, "my_song.txt")
+    st.header("3. เนื้อเพลงจาก AI")
+    if 'user_story' in st.session_state and 'genre' in st.session_state:
+        # ระบบแต่งเพลงออฟไลน์
+        chords = ["C", "G", "Am", "F"]
+        lyrics = f"🎼 แนว: {st.session_state.genre}\n" + "-"*30 + "\n"
+        for line in st.session_state.user_story.split('\n'):
+            if line.strip():
+                lyrics += f"({random.choice(chords)}) {line}\n"
+        st.code(lyrics)
+        
+        st.write("📤 **แชร์ก่อนดาวน์โหลด**")
+        if st.button("กดแชร์"):
+            st.session_state.shared = True
+        if st.session_state.get('shared'):
+            st.download_button("💾 ดาวน์โหลดเพลง", lyrics, file_name="song.txt")
     else:
-        st.write("กรุณาเขียนความในใจและเลือกแนวเพลงก่อนครับ")
+        st.write("กรุณากรอกข้อมูลหน้า 1 และ 2 ก่อน")
 
-# --- หน้า 4: หน้าเสริม ปรับทุกข์กับ AI ---
+# --- หน้า 4: ปรับทุกข์ ---
 with tab4:
-    st.header("4. ปรึกษา AI อยู่นิ่งๆ ไม่เจ็บตัว")
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt_chat := st.chat_input("คุยได้ทุกเรื่อง..."):
-        st.session_state.messages.append({"role": "user", "content": prompt_chat})
-        with st.chat_message("user"):
-            st.markdown(prompt_chat)
-
-        with st.chat_message("assistant"):
-            full_prompt = f"คุณคือ AI ชื่อ 'อยู่นิ่งๆ ไม่เจ็บตัว' ทำหน้าที่รับฟังและปลอบโยนคนเศร้า ตอบกลับคำถามนี้: {prompt_chat}"
-            response = model.generate_content(full_prompt)
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
+    st.header("4. คุยกับ AI อยู่นิ่งๆ ไม่เจ็บตัว")
+    chat = st.text_input("บอกความรู้สึกของคุณ...")
+    if chat:
+        st.write("🤖 AI: อยู่นิ่งๆ นะครับ ผมรับฟังคุณอยู่เสมอ...")
