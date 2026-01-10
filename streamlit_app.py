@@ -1,109 +1,103 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. ดึง API Key จากที่ซ่อน (Secrets) ---
+# --- การดึง API Key จากที่ซ่อน (Secrets) ---
+# เมื่อรันบน Streamlit Cloud ให้ตั้งชื่อใน Secrets ว่า GEMINI_API_KEY
 try:
-    # ระบบจะดึงค่าจากไฟล์ลับที่ชื่อ GEMINI_API_KEY โดยตรง ไม่ต้องวางรหัสในนี้
-    GOOGLE_API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
 except:
-    st.error("❌ ไม่พบรหัสในที่ซ่อน! (กรุณาตั้งค่า GEMINI_API_KEY ใน Secrets)")
-    st.stop()
+    st.error("⚠️ ไม่พบ API Key! กรุณาตั้งค่าใน Streamlit Secrets")
 
-# --- 2. ปรับแต่งหน้าตาแอป (สีเข้มสะใจ & ไม่โล่ง) ---
+# ลิงก์ไฟล์ MP3 จาก GitHub (คุณสามารถเปลี่ยนเป็นลิงก์ของคุณได้เลย)
+MUSIC_URL = "https://raw.githubusercontent.com/ชื่อUser/ชื่อProject/main/music.mp3"
+
+# --- การตั้งค่าหน้าตาแอป ---
+st.set_page_config(page_title="Synapse - อยู่นิ่งๆ ไม่เจ็บตัว", layout="centered")
+
+# CSS ปรับแต่งสี (แดง น้ำเงิน เขียว ขาว)
 st.markdown("""
     <style>
-    .stApp { background-color: #000033; color: white; }
+    .stApp { background-color: #0000FF; color: #FFFFFF; }
+    h1, h2, h3 { color: #FFFFFF; text-shadow: 2px 2px #FF0000; }
     .stButton>button { 
-        background-color: #990000; color: white; border: 2px solid white; 
-        font-weight: bold; border-radius: 10px; height: 3.5em; width: 100%;
+        background-color: #FF0000; color: white; 
+        border: 2px solid #FFFFFF; width: 100%; font-weight: bold; font-size: 20px;
     }
-    .stTextArea>div>div>textarea { background-color: #001a00; color: white; border: 2px solid #00FF00; }
-    /* กล่องเครื่องเล่นเพลงหน้ากลาง */
-    .player-container { 
-        background: linear-gradient(145deg, #000066, #000033);
-        padding: 20px; border-radius: 15px; border: 3px solid #FF0000; 
-        margin-bottom: 25px; text-align: center;
-    }
+    div[data-testid="stTextArea"] textarea { background-color: #FFFFFF; color: #000; border: 5px solid #FF0000; font-size: 18px; }
+    div[data-testid="stSelectbox"] div { background-color: #FFFFFF; color: #000; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. เครื่องเล่นเพลงหน้ากลาง (SYNAPSE AUDIO PLAYER) ---
-st.markdown('<div class="player-container">', unsafe_allow_html=True)
-st.markdown("### 🎧 SYNAPSE PLAYER : อยู่นิ่งๆ ไม่เจ็บตัว")
-try:
-    st.audio("music.mp3", loop=True)
-    st.caption("🎵 กำลังเล่นเพลงบำบัดแบบวนลูป (MP3 Mode)")
-except:
-    st.warning("⚠️ โปรดอัปโหลดไฟล์ music.mp3 เพื่อเริ่มฟัง")
-st.markdown('</div>', unsafe_allow_html=True)
+# --- โครงสร้างหน้าแอป (Tabs) ---
+tab1, tab2, tab3 = st.tabs(["📝 1.ระบายความในใจ", "🎸 2.สร้างบทเพลง", "💬 3.คุยกับ AI"])
 
-# --- 4. โครงสร้าง 4 หน้าหลัก พร้อมปุ่มฟังก์ชันแน่นๆ ---
-tabs = st.tabs(["🔥 ระบายใจ", "🎷 เลือกแนว", "🎹 รับเพลง", "🤝 ปรับทุกข์"])
+# หน้า 1: ระบายความในใจ
+with tab1:
+    st.title("SYNAPSE")
+    st.subheader("อยู่นิ่งๆ ไม่เจ็บตัว")
+    user_story = st.text_area("กระดานข้อความ: ละบายความในใจตามที่คุณต้องการ...", height=250)
+    st.write("เมื่อระบายเสร็จแล้ว ให้กดไปที่เมนู 'สร้างบทเพลง' ด้านบน")
 
-with tabs[0]:
-    st.markdown("### กระดานปลดปล่อยความอัดอั้น")
-    # แบ่งคอลัมน์ไม่ให้โล่ง
-    c1, c2 = st.columns([5, 1])
-    with c1:
-        user_input = st.text_area("วันนี้เป็นยังไงบ้าง? พิมพ์ออกมาให้หมด...", height=350)
-    with c2:
-        st.write("เครื่องมือ")
-        st.button("🧹 ล้าง")
-        st.button("🔥 เผา")
-        st.button("💾 เซฟ")
+# หน้า 2 & 3: เลือกแนวเพลงและแสดงผลเนื้อเพลงพร้อมคอร์ด
+with tab2:
+    st.header("เลือกแนวเนื้อเพลง")
+    genre = st.selectbox("แนวเพลงที่คุณชอบ:", 
+                        ["Pop", "Rock", "R&B", "Rap", "Hip-hop", "ลูกทุ่ง", "เพื่อชีวิต", "หมอลำ"])
     
-    st.write(f"จำนวนตัวอักษร: {len(user_input)} | สถานะ: กำลังรับข้อมูล")
-
-with tabs[1]:
-    st.markdown("### เลือกท่วงทำนองที่จะเยียวยาหัวใจ")
-    genre = st.selectbox("สไตล์เพลง:", ["หมอลำ", "Pop", "Rock", "Rap", "ลูกทุ่ง", "เพื่อชีวิต"])
-    
-    # เพิ่มปุ่มให้หน้าไม่โล่ง
-    col_a, col_b, col_c = st.columns(3)
-    col_a.button("🔈 ฟังตัวอย่าง")
-    col_b.button("🎲 สุ่มแนว")
-    col_c.button("⭐ ยอดนิยม")
-    
-    st.info("💡 คำแนะนำ: แนว 'หมอลำ' และ 'ลูกทุ่ง' จะให้พลังบวกในการสู้ชีวิตสูงมาก")
-
-with tabs[2]:
-    st.markdown("### ผลลัพธ์บทเพลงจาก AI (อยู่นิ่งๆ ไม่เจ็บตัว)")
-    if st.button("✨ เริ่มการปรุงเพลงบำบัด (AI RUN)"):
-        if user_input:
-            with st.spinner("AI กำลังเปลี่ยนความทุกข์ของคุณให้เป็นเสียงเพลง..."):
-                prompt = f"คุณคือ อยู่นิ่งๆ ไม่เจ็บตัว แต่งเพลง {genre} จากข้อความ: {user_input} พร้อมคอร์ด"
-                result = model.generate_content(prompt).text
-                st.code(result, language='text')
+    if st.button("ขยายความให้เป็นบทเพลง"):
+        if user_story:
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                prompt = f"คุณคือ AI ชื่อ 'อยู่นิ่งๆไม่เจ็บตัว' จงนำข้อความนี้: '{user_story}' มาขยายความและแต่งเป็นเพลงแนว {genre} พร้อมระบุคอร์ดและคีย์เพลงในแต่ละประโยคให้ชัดเจน"
                 
-                # ปุ่มฟังก์ชันหน้า 3
-                btn_1, btn_2 = st.columns(2)
-                btn_1.button("📋 คัดลอกเนื้อเพลง")
-                btn_2.button("🖼️ ทำเป็นรูปภาพ")
-                
-                st.markdown("---")
-                st.write("🔓 ทำภารกิจเพื่อดาวน์โหลดไฟล์:")
-                s1, s2, s3 = st.columns(3)
-                s1.button("Facebook")
-                s2.button("Instagram")
-                s3.button("Share Link")
+                with st.spinner('AI กำลังแต่งเพลง...'):
+                    response = model.generate_content(prompt)
+                    st.session_state.result = response.text
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาด: {e}")
         else:
-            st.error("กรุณากลับไปที่หน้า 'ระบายใจ' เพื่อพิมพ์ข้อความก่อนครับ")
+            st.warning("กรุณากลับไปพิมพ์ระบายที่หน้าแรกก่อนครับ")
 
-with tabs[3]:
-    st.markdown("### คุยปรึกษาส่วนตัวกับ 'อยู่นิ่งๆ ไม่เจ็บตัว'")
-    if "chat_history" not in st.session_state: st.session_state.chat_history = []
-    
-    # แสดงประวัติแชท
-    for m in st.session_state.chat_history:
-        with st.chat_message(m["role"]): st.write(m["content"])
+    if 'result' in st.session_state:
+        st.markdown("### 📄 เนื้อเพลงพร้อมคอร์ดจาก AI 'อยู่นิ่งๆ'")
+        st.code(st.session_state.result, language="text")
         
-    if chat_p := st.chat_input("คุยกับผมได้ทุกเรื่องที่นี่..."):
-        st.session_state.chat_history.append({"role": "user", "content": chat_p})
-        with st.chat_message("user"): st.write(chat_p)
+        # ส่วนเสริมหน้า 4: ปุ่มแชร์และโหลด
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        with col1: st.button("👍 กดไลค์")
+        with col2: 
+            if st.button("📢 กดแชร์เพื่อดาวน์โหลด"):
+                st.session_state.shared = True
+                st.success("ขอบคุณที่แชร์!")
+        with col3:
+            if st.session_state.get('shared', False):
+                st.button("💾 ดาวน์โหลด")
+            else:
+                st.button("💾 ดาวน์โหลด (ต้องแชร์ก่อน)", disabled=True)
+
+# หน้า 4 (เสริม): ปรับทุกข์กับ AI
+with tab3:
+    st.header("คุยกับ AI อยู่นิ่งๆ ไม่เจ็บตัว")
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    for chat in st.session_state.chat_history:
+        with st.chat_message(chat["role"]):
+            st.write(chat["content"])
+
+    if chat_input := st.chat_input("พูดคุยได้ทุกเรื่องแล้วแต่จะคุย..."):
+        st.session_state.chat_history.append({"role": "user", "content": chat_input})
+        with st.chat_message("user"): st.write(chat_input)
         
-        # AI ตอบโต้
-        reply = model.generate_content(f"ตอบในฐานะเพื่อนที่เข้าใจที่สุด: {chat_p}").text
-        st.session_state.chat_history.append({"role": "assistant", "content": reply})
-        with st.chat_message("assistant"): st.write(reply)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(chat_input)
+        
+        st.session_state.chat_history.append({"role": "assistant", "content": response.text})
+        with st.chat_message("assistant"): st.write(response.text)
+
+# --- หน้า 5: เครื่องเล่นเพลง (เล่นวนตลอดเวลา) ---
+st.sidebar.markdown("### 🎵 Music Player")
+st.sidebar.write("เล่นเพลงวนไปตลอดเวลาอัตโนมัติ")
+st.sidebar.audio(MUSIC_URL, format="audio/mp3", loop=True)
