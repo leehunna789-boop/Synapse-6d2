@@ -1,3 +1,4 @@
+pyworld
 streamlit
 google-generativeai
 pygame
