@@ -3,3 +3,6 @@ google-generativeai
 pygame
 pandas
 kivy
+librosa
+numpy
+soundfile
