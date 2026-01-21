@@ -8,3 +8,4 @@ librosa
 numpy
 soundfile
 pydub
+pip install streamlit librosa numpy praat-parselmouth
