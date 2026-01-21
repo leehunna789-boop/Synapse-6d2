@@ -7,3 +7,4 @@ kivy
 librosa
 numpy
 soundfile
+pydub
