@@ -3,61 +3,68 @@ import librosa
 import numpy as np
 import io
 import requests
-from pydub import AudioSegment
 import soundfile as sf
+from pydub import AudioSegment
 
-# 1. ตั้งค่าไฟล์ตัวอย่าง (Sample) จาก GitHub
 RAW_URL = "https://raw.githubusercontent.com/leehunna789-boop/Synapse-6d2/main/"
-# ใช้ไฟล์ vocal.wav หรือ rnb_vocal_ref.wav เป็นต้นแบบของระดับเสียง
-SAMPLE_VOCAL = "vocal.wav" 
+FILES = ["vocal.wav", "guitar.wav", "drums.wav", "bass.wav", "others.wav"]
 
-st.title("🛡️ ระบบปรับเสียงพูดให้ตรงกับเสียงตัวอย่าง")
+st.title("🛡️ ระบบเปลี่ยนเสียงพูดเป็นเพลง (Full Mix)")
 
-# --- โหลดไฟล์ตัวอย่างเพื่อหา Pitch ต้นแบบ ---
 @st.cache_data
-def get_sample_pitch():
-    try:
-        r = requests.get(RAW_URL + SAMPLE_VOCAL, timeout=15)
-        if r.status_code == 200:
-            data, sr = sf.read(io.BytesIO(r.content))
-            if len(data.shape) > 1: data = data[:, 0]
-            # หาความถี่เฉลี่ยของเสียงต้นแบบ
-            f0, _, _ = librosa.pyin(data, sr=sr, fmin=50, fmax=500)
-            return np.nanmean(f0)
-    except:
-        return 130.81 # ค่าเริ่มต้นถ้าโหลดไม่ได้ (Note C)
-    return 130.81
-
-target_pitch = get_sample_pitch()
-
-# 2. ส่วนรับเสียงของคุณ
-user_voice = st.audio_input("ส่งเสียงพูดของคุณ (ระบบจะปรับให้ตรงกับเสียงตัวอย่าง)")
-
-if user_voice:
-    with st.spinner("กำลังปรับระดับเสียง..."):
+def load_all_stems():
+    stems = {}
+    for f in FILES:
         try:
-            # อ่านเสียงที่คุณพูด
-            y, sr = sf.read(io.BytesIO(user_voice.read()))
-            if len(y.shape) > 1: y = y[:, 0]
+            r = requests.get(RAW_URL + f, timeout=10)
+            if r.status_code == 200:
+                # โหลดเป็น numpy สำหรับประมวลผล และ AudioSegment สำหรับรวมเสียง
+                y, sr = sf.read(io.BytesIO(r.content))
+                stems[f] = {"data": (y if len(y.shape) == 1 else y[:, 0]), "sr": sr, "raw": r.content}
+        except: pass
+    return stems
 
-            # หาความถี่เสียงที่คุณพูด
-            f0_user, _, _ = librosa.pyin(y, sr=sr, fmin=50, fmax=500)
-            current_pitch = np.nanmean(f0_user) if np.any(~np.isnan(f0_user)) else 150
+all_stems = load_all_stems()
 
-            # คำนวณระยะห่างเพื่อปรับ (Pitch Shifting)
-            # n_steps คือจำนวนครึ่งเสียงที่ต้องปรับเพื่อให้เท่ากับต้นแบบ
-            n_steps = 12 * np.log2(target_pitch / current_pitch)
+user_voice = st.audio_input("บันทึกเสียงพูดของคุณเพื่อสร้างเพลง")
 
-            # ปรับเสียงพูดของเราให้ตรงกับตัวอย่าง
-            shifted_audio = librosa.effects.pitch_shift(y, sr=sr, n_steps=n_steps)
-
-            # 3. ส่งผลลัพธ์ออกมา
-            out_buf = io.BytesIO()
-            sf.write(out_buf, shifted_audio, sr, format='WAV')
+if user_voice and "vocal.wav" in all_stems:
+    with st.spinner("กำลังเปลี่ยนเสียงพูดเป็นเพลงและผสมเสียง..."):
+        try:
+            # 1. โหลดดนตรีต้นแบบ (Carrier)
+            carrier = all_stems["vocal.wav"]["data"]
+            sr = all_stems["vocal.wav"]["sr"]
             
-            st.write(f"ระดับเสียงต้นแบบ: {target_pitch:.2f} Hz | เสียงของคุณ: {current_pitch:.2f} Hz")
-            st.audio(out_buf, format="audio/wav")
-            st.success("ปรับเสียงให้ตรงกับตัวอย่างเรียบร้อยแล้ว!")
-
+            # 2. อ่านเสียงพูด (Modulator)
+            y_user, _ = sf.read(io.BytesIO(user_voice.read()))
+            if len(y_user.shape) > 1: y_user = y_user[:, 0]
+            
+            # ปรับความยาวให้เท่ากัน
+            y_user = librosa.util.fix_length(y_user, size=len(carrier))
+            
+            # 3. กระบวนการ Vocoder (สร้างเสียงร้องตามคีย์)
+            envelope = np.abs(librosa.hilbert(y_user))
+            vocoded_y = librosa.util.normalize(carrier * envelope)
+            
+            # 4. รวมเสียง (Mix) กับไฟล์อื่นๆ (Guitar, Drums, Bass)
+            # แปลงเสียงร้องที่สร้างใหม่เป็น AudioSegment
+            out_mem = io.BytesIO()
+            sf.write(out_mem, vocoded_y, sr, format='WAV')
+            out_mem.seek(0)
+            final_vocal = AudioSegment.from_file(out_mem, format="wav")
+            
+            # เอาไฟล์อื่นมา Overlay
+            combined = final_vocal
+            for f in ["guitar.wav", "drums.wav", "bass.wav", "others.wav"]:
+                if f in all_stems:
+                    track = AudioSegment.from_file(io.BytesIO(all_stems[f]["raw"]), format="wav")
+                    combined = combined.overlay(track)
+            
+            # 5. เล่นเพลงที่เสร็จสมบูรณ์
+            final_buf = io.BytesIO()
+            combined.export(final_buf, format="wav")
+            st.audio(final_buf)
+            st.success("เพลงของคุณสร้างเสร็จแล้ว! เสียงพูดตรงคีย์คอร์ดทั้งหมดครับ")
+            
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาด: {e}")
