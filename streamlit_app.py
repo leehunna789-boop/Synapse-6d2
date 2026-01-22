@@ -1,45 +1,29 @@
+import streamlit as st
 import librosa
 import numpy as np
-import scipy.stats
+import pandas as pd
+from PIL import Image
 
-# --- 1. พิมพ์ชื่อไฟล์ที่คุณต้องการวัดค่า (เลือกทีละไฟล์จากในเครื่องคุณ) ---
-# เช่น: "การเดินทางของฉัน_ร้อง.2.mp3" หรือ "การเดินทางของฉัน กลอง.mp3"
-target_file = "การเดินทางของฉัน_ร้อง.2.mp3" 
+# 1. ส่วนแสดงโลโก้ (ดึงไฟล์ logo.jpg มาโชว์)
+try:
+    img = Image.open("logo.jpg")
+    st.image(img, use_container_width=True)
+except:
+    st.warning("อย่าลืมเอาไฟล์ logo.jpg ไปวางไว้ในโฟลเดอร์เดียวกันนะลูกพี่!")
 
-def extract_real_dna(filename):
-    try:
-        # โหลดไฟล์เสียงลงหน่วยความจำเครื่อง
-        y, sr = librosa.load(filename, sr=None)
-        
-        # 8-9. Formants (F1, F2) - วัดรูปปากและการวางลิ้นแบบสมจริง
-        pre_emp = librosa.effects.preemphasis(y)
-        a = librosa.lpc(pre_emp, order=int(2 + sr / 1000))
-        roots = [r for r in np.roots(a) if np.imag(r) > 0]
-        f_vals = sorted(np.arctan2(np.imag(roots), np.real(roots)) * (sr / (2 * np.pi)))
-        f1, f2 = (f_vals[0], f_vals[1]) if len(f_vals) > 1 else (0, 0)
+# 2. ส่วนหัวข้อและสโลแกน
+st.title("🔊 SYNAPSE: Dynamics Meter")
+st.write("สโลแกน: 'อยู่นิ่งๆ ไม่เจ็บตัว'") # [cite: 2025-12-20]
 
-        # 10. Spectral Tilt - วัดความนุ่มนวล/ความกระด้างของอารมณ์
-        S = np.abs(librosa.stft(y))
-        freqs = librosa.fft_frequencies(sr=sr)
-        slope, _, _, _, _ = scipy.stats.linregress(freqs, np.mean(S, axis=1))
+# 3. ส่วนการทำงาน
+file = st.file_uploader("อัปโหลดไฟล์เสียงเพื่อวัดค่า", type=["wav", "mp3"])
 
-        # 11. HNR (Harmonics-to-Noise) - วัด "ลมหายใจ" (หัวใจของความสมจริง)
-        harmonic, percussive = librosa.effects.hpss(y)
-        hnr = 10 * np.log10(np.sum(harmonic**2) / np.sum(percussive**2)) if np.sum(percussive**2) > 0 else 0
-
-        # 12. RT60 Proxy - วัดมิติพื้นที่ (ห้องก้องหรือห้องแห้ง)
-        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
-        rt60 = abs(1 / np.mean(np.diff(onset_env))) if len(onset_env) > 1 else 0
-
-        print(f"\n--- รายงาน DNA เสียง: {filename} ---")
-        print(f"8.  F1 (ความกว้างปาก): {f1:.2f} Hz")
-        print(f"9.  F2 (ตำแหน่งลิ้น): {f2:.2f} Hz")
-        print(f"10. Tilt (ความนุ่ม): {slope:.8f}")
-        print(f"11. HNR (ลมหายใจ): {hnr:.2f} dB")
-        print(f"12. RT60 (มิติห้อง): {rt60:.4f}")
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-# สั่งทำงาน
-extract_real_dna(target_file)
+if file:
+    y, sr = librosa.load(file)
+    rms = librosa.feature.rms(y=y)[0]
+    
+    st.metric("ความดังเฉลี่ย (Dynamics)", f"{np.mean(rms)*100:.4f}")
+    
+    st.subheader("📊 กราฟมิติความดัง")
+    st.line_chart(pd.DataFrame(rms, columns=["Level"]))
+    st.success("วัดค่าสำเร็จ! ส่งผลให้เพื่อนดูได้เลย")
