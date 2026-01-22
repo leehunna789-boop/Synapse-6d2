@@ -1,73 +1,45 @@
-import streamlit as st
 import librosa
 import numpy as np
-import parselmouth
-import io
+import scipy.stats
 
-st.title("🎙 เครื่องวัดค่าเสียงแม่นยำสูง (Vocal Master Engine)")
+# --- 1. พิมพ์ชื่อไฟล์ที่คุณต้องการวัดค่า (เลือกทีละไฟล์จากในเครื่องคุณ) ---
+# เช่น: "การเดินทางของฉัน_ร้อง.2.mp3" หรือ "การเดินทางของฉัน กลอง.mp3"
+target_file = "การเดินทางของฉัน_ร้อง.2.mp3" 
 
-uploaded_file = st.file_uploader("อัปโหลดไฟล์เสียงเพื่อวัดค่า", type=['wav', 'mp3'])
+def extract_real_dna(filename):
+    try:
+        # โหลดไฟล์เสียงลงหน่วยความจำเครื่อง
+        y, sr = librosa.load(filename, sr=None)
+        
+        # 8-9. Formants (F1, F2) - วัดรูปปากและการวางลิ้นแบบสมจริง
+        pre_emp = librosa.effects.preemphasis(y)
+        a = librosa.lpc(pre_emp, order=int(2 + sr / 1000))
+        roots = [r for r in np.roots(a) if np.imag(r) > 0]
+        f_vals = sorted(np.arctan2(np.imag(roots), np.real(roots)) * (sr / (2 * np.pi)))
+        f1, f2 = (f_vals[0], f_vals[1]) if len(f_vals) > 1 else (0, 0)
 
-if uploaded_file is not None:
-    # อ่านไฟล์เสียง
-    file_bytes = uploaded_file.read()
-    snd = parselmouth.Sound(file_bytes)
-    
-    # แปลงเป็น numpy สำหรับ librosa
-    y, sr = librosa.load(io.BytesIO(file_bytes), sr=None)
+        # 10. Spectral Tilt - วัดความนุ่มนวล/ความกระด้างของอารมณ์
+        S = np.abs(librosa.stft(y))
+        freqs = librosa.fft_frequencies(sr=sr)
+        slope, _, _, _, _ = scipy.stats.linregress(freqs, np.mean(S, axis=1))
 
-    # 1. การสั่น (Vibrato) - หา Standard Deviation ของ Pitch (Hz)
-    pitch = snd.to_pitch()
-    f0 = pitch.selected_array['frequency']
-    v_pitches = f0[f0 > 0] # กรองเฉพาะตอนที่มีเสียง
-    vibrato_val = np.std(v_pitches) if len(v_pitches) > 0 else 0
+        # 11. HNR (Harmonics-to-Noise) - วัด "ลมหายใจ" (หัวใจของความสมจริง)
+        harmonic, percussive = librosa.effects.hpss(y)
+        hnr = 10 * np.log10(np.sum(harmonic**2) / np.sum(percussive**2)) if np.sum(percussive**2) > 0 else 0
 
-    # 2. การเอื้อน (Pitch Transition) - วัดความต่างระหว่างโน้ตต่อโน้ต
-    transition_val = np.mean(np.abs(np.diff(v_pitches))) if len(v_pitches) > 1 else 0
+        # 12. RT60 Proxy - วัดมิติพื้นที่ (ห้องก้องหรือห้องแห้ง)
+        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+        rt60 = abs(1 / np.mean(np.diff(onset_env))) if len(onset_env) > 1 else 0
 
-    # 3. น้ำหนักเสียง (Timbre) - วัดค่าความใส (Spectral Centroid)
-    centroid = librosa.feature.spectral_centroid(y=y, sr=sr)
-    timbre_val = np.mean(centroid)
+        print(f"\n--- รายงาน DNA เสียง: {filename} ---")
+        print(f"8.  F1 (ความกว้างปาก): {f1:.2f} Hz")
+        print(f"9.  F2 (ตำแหน่งลิ้น): {f2:.2f} Hz")
+        print(f"10. Tilt (ความนุ่ม): {slope:.8f}")
+        print(f"11. HNR (ลมหายใจ): {hnr:.2f} dB")
+        print(f"12. RT60 (มิติห้อง): {rt60:.4f}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
 
-    # 4. ความดัง-เบา (Dynamics) - วัดค่า RMS (พลังงานเสียง)
-    rms = librosa.feature.rms(y=y)
-    dynamics_val = np.mean(rms) * 100 # คูณ 100 ให้เห็นตัวเลขชัดขึ้น
-
-    # 5. จังหวะคำ (Phoneme Timing) - วัดจำนวนการขยับของเสียงต่อวินาที
-    onsets = librosa.onset.onset_detect(y=y, sr=sr)
-    duration = librosa.get_duration(y=y, sr=sr)
-    timing_val = len(onsets) / duration if duration > 0 else 0
-
-    # 6. เสียงแหลม (Sibilance) - วัด Zero Crossing Rate
-    zcr = librosa.feature.zero_crossing_rate(y)
-    sibilance_val = np.mean(zcr)
-
-    # 7. คุมความเงียบ (Silence Gate) - วัด Noise Floor (ค่าพลังงานต่ำสุด)
-    silence_val = np.min(rms) if len(rms) > 0 else 0
-
-    # --- แสดงผลหน้าจอแบบตัวเลขเน้นๆ ---
-    st.markdown("### 📊 ผลการวัดค่าเพื่อกำหนดแนวเพลง")
-    
-    cols = st.columns(2)
-    with cols[0]:
-        st.metric("1. Vibrato (สั่น)", f"{vibrato_val:.2f} Hz")
-        st.metric("2. Transition (เอื้อน)", f"{transition_val:.4f}")
-        st.metric("3. Timbre (เนื้อเสียง)", f"{timbre_val:.2f}")
-        st.metric("4. Dynamics (น้ำหนัก)", f"{dynamics_val:.4f}")
-    with cols[1]:
-        st.metric("5. Timing (จังหวะ)", f"{timing_val:.2f} onset/sec")
-        st.metric("6. Sibilance (เสียงแหลม)", f"{sibilance_val:.4f}")
-        st.metric("7. Silence Gate (ความเงียบ)", f"{silence_val:.6f}")
-
-    # ปุ่มสำหรับดูข้อมูลแบบดิบ
-    if st.button("ดูรายงานสรุปสำหรับก๊อปปี้"):
-        report = {
-            "vibrato": vibrato_val,
-            "transition": transition_val,
-            "timbre": timbre_val,
-            "dynamics": dynamics_val,
-            "timing": timing_val,
-            "sibilance": sibilance_val,
-            "silence": silence_val
-        }
-        st.json(report)
+# สั่งทำงาน
+extract_real_dna(target_file)
