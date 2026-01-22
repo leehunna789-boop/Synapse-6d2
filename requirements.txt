@@ -8,5 +8,4 @@ librosa
 numpy
 soundfile
 pydub
-librosa
 praat-parselmouth
