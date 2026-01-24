@@ -1,5 +1,16 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import streamlit as st
+
+# โค้ดสำหรับซ่อนเมนูและปุ่ม "Manage App"
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 st.set_page_config(page_title="Heavy Metal MP3 Player", layout="wide")
 
@@ -76,7 +87,7 @@ html_code = """
         <div class="knob-container">
             <div>
                 <span class="knob-label">🔊 BASS BOOST</span>
-                <input type="range" id="bassBoost" class="slider" min="0" max="20" value="0">
+                <input type="range" id="bassBoost" class="slider" min="0" max="10" value="0">
             </div>
             <div>
                 <span class="knob-label">🎚️ MIX GAIN</span>
@@ -152,7 +163,7 @@ html_code = """
         function toggle() { currentPlayer.paused ? play() : pause(); }
         function pause() { currentPlayer.pause(); document.getElementById('playBtn').innerText = '▶'; document.getElementById('circle').classList.remove('active');}
 
-        // ระบบ Crossfade: เพลงต่อไปจะค่อยๆ ดังขึ้นก่อนเพลงเก่าจบ 5 วินาที
+        // ระบบ Crossfade: เพลงต่อไปจะค่อยๆ ดังขึ้นก่อนเพลงเก่าจบ 10 วินาที
         function checkCrossfade() {
             if (currentPlayer.duration - currentPlayer.currentTime < 5 && songs.length > 1) {
                 let nextIdx = (current + 1) % songs.length;
@@ -209,5 +220,5 @@ html_code = """
 </html>
 """
 
-st.markdown("<h1 style='text-align: center; color: #00ff88;'>🦾 MP3.PLAYER.อยู่นิ้งๆไม่เจ็บตัว</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #00ff88;'>🦾 MP3.PLAYER.MUSIC.อยู่นิ้งๆไม่เจ็บตัว</h1>", unsafe_allow_html=True)
 components.html(html_code, height=800)
