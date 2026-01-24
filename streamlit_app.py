@@ -1,237 +1,101 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# ตั้งค่าหน้าจอ Streamlit เล็กน้อย
+st.set_page_config(page_title="My Music Player", layout="centered")
+
+# 1. นำโค้ด HTML/CSS/JS ทั้งหมดมาใส่ในตัวแปร html_code (ใช้เครื่องหมายคำพูด 3 อัน """ เพื่อคลุมทั้งหมด)
+html_code = """
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Music Player - Bright Idea!</title>
     <style>
-        :root {
-            --primary-color: #2ecc71;
-            --bg-color: #1a1a1a;
-            --card-bg: #2d2d2d;
-            --text-color: #ffffff;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-
-        .player-card {
-            background: var(--card-bg);
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            width: 350px;
-            text-align: center;
-        }
-
-        .track-info h2 { margin-bottom: 5px; font-size: 1.2rem; }
-        .track-info p { color: #aaa; margin-top: 0; }
-
-        .controls {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            margin: 20px 0;
-        }
-
-        button {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 1.5rem;
-            transition: transform 0.2s;
-        }
-
-        button:hover { transform: scale(1.1); color: var(--primary-color); }
-
-        #playPauseBtn { font-size: 3rem; }
-
-        .volume-container, .progress-container {
-            margin: 15px 0;
-            width: 100%;
-        }
-
+        :root { --primary-color: #2ecc71; --bg-color: #1a1a1a; --card-bg: #2d2d2d; --text-color: #ffffff; }
+        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; }
+        .player-card { background: var(--card-bg); padding: 20px; border-radius: 20px; width: 320px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .controls button { background: none; border: none; color: white; cursor: pointer; font-size: 1.5rem; margin: 0 10px; }
         input[type="range"] { width: 100%; accent-color: var(--primary-color); }
-
-        .playlist {
-            text-align: left;
-            max-height: 150px;
-            overflow-y: auto;
-            margin-top: 20px;
-            border-top: 1px solid #444;
-            padding-top: 10px;
-        }
-
-        .playlist-item {
-            padding: 8px;
-            cursor: pointer;
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-
-        .playlist-item:hover { background: #3d3d3d; }
-        .active-track { color: var(--primary-color); font-weight: bold; }
-
-        .upload-section { margin-top: 15px; }
-        .custom-file-upload {
-            display: inline-block;
-            padding: 8px 20px;
-            background: var(--primary-color);
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        #shareBtn {
-            margin-top: 10px;
-            font-size: 0.9rem;
-            color: #3498db;
-            text-decoration: underline;
-        }
+        .playlist { text-align: left; max-height: 150px; overflow-y: auto; margin-top: 15px; border-top: 1px solid #444; }
+        .custom-file-upload { display: inline-block; padding: 8px 20px; background: var(--primary-color); border-radius: 20px; cursor: pointer; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
-
-<div class="player-card">
-    <div class="track-info">
-        <h2 id="title">เลือกเพลงเพื่อเริ่มฟัง</h2>
-        <p id="artist">กดปุ่มสีเขียวเพื่อเพิ่มเพลง</p>
-    </div>
-
-    <div class="progress-container">
-        <input type="range" id="progressBar" value="0" step="1">
-    </div>
-
-    <div class="controls">
-        <button onclick="prevTrack()">⏮</button>
-        <button id="playPauseBtn" onclick="togglePlay()">▶️</button>
-        <button onclick="nextTrack()">⏭</button>
-    </div>
-
-    <div class="volume-container">
-        <span>🔊</span>
+    <div class="player-card">
+        <h3>🎵 My Player</h3>
+        <p id="title">ยังไม่มีเพลง</p>
+        <input type="range" id="progressBar" value="0">
+        <div class="controls">
+            <button onclick="prevTrack()">⏮</button>
+            <button id="playPauseBtn" onclick="togglePlay()">▶️</button>
+            <button onclick="nextTrack()">⏭</button>
+        </div>
         <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="1">
-    </div>
-
-    <div class="upload-section">
         <label class="custom-file-upload">
             <input type="file" id="fileInput" multiple accept="audio/*" style="display:none;">
-            ➕ เพิ่มเพลง MP3
+            เพิ่มเพลง
         </label>
+        <div id="playlist" class="playlist"></div>
     </div>
 
-    <div class="playlist" id="playlist">
-        </div>
+    <audio id="audioPlayer"></audio>
 
-    <button id="shareBtn" onclick="shareApp()">🔗 แชร์แอปนี้ให้เพื่อน</button>
-</div>
+    <script>
+        const audio = document.getElementById('audioPlayer');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const fileInput = document.getElementById('fileInput');
+        const playlistDisplay = document.getElementById('playlist');
+        const title = document.getElementById('title');
+        const progressBar = document.getElementById('progressBar');
 
-<audio id="audioPlayer"></audio>
+        let songs = [];
+        let currentSongIndex = 0;
 
-<script>
-    const audio = document.getElementById('audioPlayer');
-    const playPauseBtn = document.getElementById('playPauseBtn');
-    const fileInput = document.getElementById('fileInput');
-    const playlistDisplay = document.getElementById('playlist');
-    const title = document.getElementById('title');
-    const progressBar = document.getElementById('progressBar');
-    const volumeControl = document.getElementById('volumeControl');
-
-    let songs = [];
-    let currentSongIndex = 0;
-
-    // ระบบเพิ่มเพลง
-    fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        files.forEach(file => {
-            const url = URL.createObjectURL(file);
-            songs.push({ name: file.name, url: url });
-        });
-        updatePlaylist();
-        if (songs.length === files.length) loadSong(0);
-    });
-
-    function updatePlaylist() {
-        playlistDisplay.innerHTML = '';
-        songs.forEach((song, index) => {
-            const div = document.createElement('div');
-            div.className = `playlist-item ${index === currentSongIndex ? 'active-track' : ''}`;
-            div.innerText = `${index + 1}. ${song.name}`;
-            div.onclick = () => loadSong(index);
-            playlistDisplay.appendChild(div);
-        });
-    }
-
-    function loadSong(index) {
-        currentSongIndex = index;
-        audio.src = songs[index].url;
-        title.innerText = songs[index].name;
-        updatePlaylist();
-        playSong();
-    }
-
-    function togglePlay() {
-        if (audio.paused) playSong();
-        else pauseSong();
-    }
-
-    function playSong() {
-        if (!audio.src) return;
-        audio.play();
-        playPauseBtn.innerText = '⏸';
-    }
-
-    function pauseSong() {
-        audio.pause();
-        playPauseBtn.innerText = '▶️';
-    }
-
-    function nextTrack() {
-        currentSongIndex = (currentSongIndex + 1) % songs.length;
-        loadSong(currentSongIndex);
-    }
-
-    function prevTrack() {
-        currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
-        loadSong(currentSongIndex);
-    }
-
-    // ระบบเล่นต่อเนื่อง
-    audio.addEventListener('ended', nextTrack);
-
-    // ปรับเสียง
-    volumeControl.addEventListener('input', (e) => audio.volume = e.target.value);
-
-    // Progress Bar
-    audio.addEventListener('timeupdate', () => {
-        progressBar.max = audio.duration;
-        progressBar.value = audio.currentTime;
-    });
-
-    progressBar.addEventListener('input', () => audio.currentTime = progressBar.value);
-
-    // ปุ่มแชร์
-    function shareApp() {
-        if (navigator.share) {
-            navigator.share({
-                title: 'My Music Player',
-                text: 'ลองใช้แอปเครื่องเล่นเพลงที่ผมสร้างสิ!',
-                url: window.location.href
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                songs.push({ name: file.name, url: URL.createObjectURL(file) });
             });
-        } else {
-            alert("คัดลอกลิงก์ส่งให้เพื่อนได้เลย: " + window.location.href);
-        }
-    }
-</script>
+            updatePlaylist();
+            if (songs.length > 0 && !audio.src) loadSong(0);
+        });
 
+        function updatePlaylist() {
+            playlistDisplay.innerHTML = songs.map((s, i) => 
+                `<div style="padding:5px; cursor:pointer; color:${i===currentSongIndex?'#2ecc71':'white'}" onclick="parent.loadSongFromJS(${i})">${i+1}. ${s.name}</div>`
+            ).join('');
+        }
+
+        // ฟังชั่นเสริมสำหรับการคลิกในลิสต์ (ปรับให้เข้ากับ iframe)
+        window.loadSongFromJS = (index) => loadSong(index);
+
+        function loadSong(index) {
+            currentSongIndex = index;
+            audio.src = songs[index].url;
+            title.innerText = songs[index].name;
+            audio.play();
+            playPauseBtn.innerText = '⏸';
+            updatePlaylist();
+        }
+
+        function togglePlay() {
+            if (audio.paused) { audio.play(); playPauseBtn.innerText = '⏸'; }
+            else { audio.pause(); playPauseBtn.innerText = '▶️'; }
+        }
+
+        function nextTrack() { if(songs.length) loadSong((currentSongIndex + 1) % songs.length); }
+        function prevTrack() { if(songs.length) loadSong((currentSongIndex - 1 + songs.length) % songs.length); }
+
+        audio.addEventListener('ended', nextTrack);
+        audio.addEventListener('timeupdate', () => { progressBar.max = audio.duration; progressBar.value = audio.currentTime; });
+        progressBar.addEventListener('input', () => audio.currentTime = progressBar.value);
+    </script>
 </body>
 </html>
+"""
+
+# 2. ใช้คำสั่งนี้เพื่อแสดงผลโค้ด HTML ในหน้าเว็บ Streamlit
+st.title("MP3 Player Project 🎧")
+st.write("ไอเดียจากสนามหญ้า สู่แอปใช้งานจริง")
+
+components.html(html_code, height=600)
