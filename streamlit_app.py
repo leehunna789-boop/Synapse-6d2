@@ -2,14 +2,19 @@ import streamlit as st
 import streamlit.components.v1 as components
 import streamlit as st
 
-# โค้ดสำหรับซ่อนเมนูและปุ่ม "Manage App"
+# --- วางแทนที่ของเดิมได้เลยครับ ---
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
+            .stDeployButton {display:none !important;}
+            #stDecoration {display:none !important;}
+            [data-testid="stStatusWidget"] {display:none !important;}
+            footer {display:none !important;}
             </style>
             """
+st.markdown(hide_st_style, unsafe_allow_html=True)     """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
 st.set_page_config(page_title="Heavy Metal MP3 Player", layout="wide")
