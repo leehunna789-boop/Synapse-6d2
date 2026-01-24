@@ -1,9 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Pro Music Player", layout="centered")
+st.set_page_config(page_title="Legendary MP3 Player", layout="wide")
 
-# โค้ด HTML/JS/CSS เวอร์ชั่นอัปเกรด
 html_code = """
 <!DOCTYPE html>
 <html lang="th">
@@ -11,169 +10,166 @@ html_code = """
     <meta charset="UTF-8">
     <style>
         :root { 
-            --primary-color: #2ecc71; 
-            --bg-color: #1a1a1a; 
-            --card-bg: #2d2d2d; 
-            --text-color: #ffffff; 
-            --neon-shadow: 0 0 10px #2ecc71;
+            --neon: #00ff88; 
+            --bg: #050505;
         }
-        body { font-family: sans-serif; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: center; min-height: 95vh; margin: 0; transition: 0.3s; }
-        .player-card { background: var(--card-bg); padding: 25px; border-radius: 30px; width: 340px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.7); border: 1px solid #444; }
         
-        /* ปุ่มและไฟ */
-        .controls button { background: none; border: none; color: white; cursor: pointer; font-size: 1.8rem; margin: 0 10px; transition: 0.2s; text-shadow: var(--neon-shadow); }
-        .controls button:hover { transform: scale(1.2); color: var(--primary-color); }
-        
-        input[type="range"] { width: 100%; accent-color: var(--primary-color); cursor: pointer; }
-        
-        .eq-section { margin-top: 20px; background: #222; padding: 10px; border-radius: 15px; font-size: 0.8rem; }
-        .eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+        body { 
+            background-color: var(--bg);
+            color: white; font-family: 'Orbitron', sans-serif;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; overflow: hidden;
+        }
 
-        .playlist { text-align: left; max-height: 120px; overflow-y: auto; margin-top: 15px; border-top: 1px solid #444; padding-top: 10px; font-size: 0.85rem; }
+        /* เอฟเฟกต์พื้นหลังเรืองแสง */
+        .bg-glow {
+            position: fixed; top: 50%; left: 50%; width: 500px; height: 500px;
+            background: radial-gradient(circle, var(--neon) 0%, transparent 70%);
+            opacity: 0.1; transform: translate(-50%, -50%); z-index: -1;
+            filter: blur(80px); transition: 0.5s;
+        }
+
+        .player-box {
+            background: rgba(20, 20, 20, 0.8);
+            border: 2px solid var(--neon);
+            border-radius: 50px;
+            padding: 40px;
+            width: 350px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .visual-circle {
+            width: 220px; height: 220px;
+            border-radius: 50%; margin: 0 auto 30px;
+            border: 4px dashed var(--neon);
+            display: flex; justify-content: center; align-items: center;
+            position: relative; transition: 0.5s;
+        }
+
+        .visual-circle.active { animation: pulse 1.5s infinite; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0px var(--neon); }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px var(--neon); }
+            100% { transform: scale(1); box-shadow: 0 0 0px var(--neon); }
+        }
+
+        #title { font-size: 1.1rem; letter-spacing: 2px; margin-bottom: 20px; color: var(--neon); height: 50px; overflow: hidden; }
+
+        .btn-main {
+            background: var(--neon); color: black; border: none;
+            width: 70px; height: 70px; border-radius: 50%;
+            font-size: 2rem; cursor: pointer; font-weight: bold;
+            box-shadow: 0 0 20px var(--neon); transition: 0.3s;
+        }
+        .btn-main:hover { transform: translateY(-5px); box-shadow: 0 0 40px var(--neon); }
+
+        .slider { width: 100%; margin: 20px 0; accent-color: var(--neon); }
+
+        .controls-row { display: flex; justify-content: space-around; align-items: center; margin-top: 20px; }
         
-        .btn-action { display: inline-block; padding: 8px 15px; background: var(--primary-color); border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.8rem; margin: 5px; border: none; color: black; box-shadow: var(--neon-shadow); }
-        
-        .theme-selector { margin-top: 15px; display: flex; justify-content: center; gap: 10px; }
-        .dot { height: 15px; width: 15px; border-radius: 50%; cursor: pointer; border: 2px solid white; }
+        .side-btn { background: none; border: 1px solid var(--neon); color: var(--neon); padding: 10px; border-radius: 10px; cursor: pointer; }
+
+        .playlist-area {
+            margin-top: 30px; max-height: 120px; overflow-y: auto;
+            border-top: 1px solid #333; padding-top: 10px; font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
-    <div class="player-card">
-        <h3 style="margin-top:0;">🎧 Music Pro Max</h3>
-        <p id="title" style="color: var(--primary-color); font-weight:bold;">กรุณาเพิ่มเพลง...</p>
+    <div class="bg-glow" id="glow"></div>
+    
+    <div class="player-box">
+        <div class="visual-circle" id="circle">
+            <span style="font-size: 5rem;">🎵</span>
+        </div>
         
-        <input type="range" id="progressBar" value="0">
+        <div id="title">เลือกเพลงเพื่อเริ่มความเท่...</div>
         
-        <div class="controls">
-            <button onclick="prevTrack()">⏮</button>
-            <button id="playPauseBtn" onclick="togglePlay()">▶️</button>
-            <button onclick="nextTrack()">⏭</button>
+        <input type="range" id="progress" class="slider" value="0">
+        
+        <div class="controls-row">
+            <button class="side-btn" onclick="prev()">PREV</button>
+            <button id="playBtn" class="btn-main" onclick="toggle()">▶</button>
+            <button class="side-btn" onclick="next()">NEXT</button>
         </div>
 
-        <div class="eq-section">
-            <span>🎚️ ปรับแต่งเสียง (Equalizer)</span>
-            <div class="eq-grid">
-                <div>Bass: <input type="range" id="bassGain" min="-10" max="10" value="0"></div>
-                <div>Treble: <input type="range" id="trebleGain" min="-10" max="10" value="0"></div>
-            </div>
+        <div style="margin-top: 20px;">
+            <input type="range" id="vol" class="slider" min="0" max="1" step="0.1" value="0.7">
         </div>
 
-        <div style="margin-top:15px;">
-            <span>🔊</span> <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="0.8" style="width: 80%;">
-        </div>
+        <label style="display: block; margin-top: 20px; cursor: pointer; color: var(--neon); border: 1px solid var(--neon); padding: 10px; border-radius: 20px;">
+            <input type="file" id="files" multiple accept="audio/*" style="display:none;">
+            [ + อัปโหลดเพลง ]
+        </label>
 
-        <div class="theme-selector">
-            <span>เปลี่ยนสีไฟ:</span>
-            <div class="dot" style="background:#2ecc71" onclick="changeTheme('#2ecc71')"></div>
-            <div class="dot" style="background:#e74c3c" onclick="changeTheme('#e74c3c')"></div>
-            <div class="dot" style="background:#3498db" onclick="changeTheme('#3498db')"></div>
-            <div class="dot" style="background:#f1c40f" onclick="changeTheme('#f1c40f')"></div>
-        </div>
-
-        <div style="margin-top:15px;">
-            <label class="btn-action">
-                <input type="file" id="fileInput" multiple accept="audio/*" style="display:none;">
-                📂 เพิ่มเพลง
-            </label>
-        </div>
-
-        <div id="playlist" class="playlist"></div>
+        <div id="list" class="playlist-area"></div>
     </div>
 
-    <audio id="audioPlayer" crossOrigin="anonymous"></audio>
+    <audio id="player"></audio>
 
     <script>
-        const audio = document.getElementById('audioPlayer');
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const fileInput = document.getElementById('fileInput');
-        const playlistDisplay = document.getElementById('playlist');
-        const title = document.getElementById('title');
-        const progressBar = document.getElementById('progressBar');
-
+        const audio = document.getElementById('player');
+        const playBtn = document.getElementById('playBtn');
+        const circle = document.getElementById('circle');
+        const glow = document.getElementById('glow');
         let songs = [];
-        let currentSongIndex = 0;
-        let audioCtx, bassFilter, trebleFilter, source;
+        let current = 0;
 
-        // ระบบ Equalizer
-        function initAudioContext() {
-            if (audioCtx) return;
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            source = audioCtx.createMediaElementSource(audio);
-            
-            bassFilter = audioCtx.createBiquadFilter();
-            bassFilter.type = "lowshelf";
-            bassFilter.frequency.value = 200;
+        document.getElementById('files').onchange = (e) => {
+            const f = Array.from(e.target.files);
+            f.forEach(file => songs.push({name: file.name, url: URL.createObjectURL(file)}));
+            updateList();
+            if(!audio.src) load(0);
+        };
 
-            trebleFilter = audioCtx.createBiquadFilter();
-            trebleFilter.type = "highshelf";
-            trebleFilter.frequency.value = 3000;
-
-            source.connect(bassFilter);
-            bassFilter.connect(trebleFilter);
-            trebleFilter.connect(audioCtx.destination);
+        function load(i) {
+            current = i;
+            audio.src = songs[i].url;
+            document.getElementById('title').innerText = songs[i].name;
+            updateList();
+            play();
         }
 
-        document.getElementById('bassGain').addEventListener('input', (e) => {
-            if(bassFilter) bassFilter.gain.value = e.target.value;
-        });
-        document.getElementById('trebleGain').addEventListener('input', (e) => {
-            if(trebleFilter) trebleFilter.gain.value = e.target.value;
-        });
+        function toggle() { audio.paused ? play() : pause(); }
 
-        // เปลี่ยนสีไฟปุ่ม
-        function changeTheme(color) {
-            document.documentElement.style.setProperty('--primary-color', color);
-            document.documentElement.style.setProperty('--neon-shadow', `0 0 15px ${color}`);
-            updatePlaylist();
+        function play() { 
+            audio.play(); 
+            playBtn.innerText = '⏸'; 
+            circle.classList.add('active');
+            glow.style.opacity = "0.3";
         }
 
-        fileInput.addEventListener('change', (e) => {
-            initAudioContext();
-            const files = Array.from(e.target.files);
-            files.forEach(file => {
-                songs.push({ name: file.name, url: URL.createObjectURL(file) });
-            });
-            updatePlaylist();
-            if (songs.length > 0 && !audio.src) loadSong(0);
-        });
+        function pause() { 
+            audio.pause(); 
+            playBtn.innerText = '▶'; 
+            circle.classList.remove('active');
+            glow.style.opacity = "0.1";
+        }
 
-        function updatePlaylist() {
-            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
-            playlistDisplay.innerHTML = songs.map((s, i) => 
-                `<div style="padding:5px; cursor:pointer; color:${i===currentSongIndex?primaryColor:'white'}" onclick="parent.loadSongFromJS(${i})">${i+1}. ${s.name}</div>`
+        function next() { if(songs.length) load((current+1)%songs.length); }
+        function prev() { if(songs.length) load((current-1+songs.length)%songs.length); }
+
+        function updateList() {
+            document.getElementById('list').innerHTML = songs.map((s,i) => 
+                `<div onclick="parent.playSong(${i})" style="padding:8px; cursor:pointer; color:${i===current?'#00ff88':'#666'}">${i+1}. ${s.name}</div>`
             ).join('');
         }
+        window.playSong = load;
 
-        window.loadSongFromJS = (index) => loadSong(index);
-
-        function loadSong(index) {
-            currentSongIndex = index;
-            audio.src = songs[index].url;
-            title.innerText = songs[index].name;
-            audio.play();
-            playPauseBtn.innerText = '⏸';
-            updatePlaylist();
-        }
-
-        function togglePlay() {
-            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            if (audio.paused) { audio.play(); playPauseBtn.innerText = '⏸'; }
-            else { audio.pause(); playPauseBtn.innerText = '▶️'; }
-        }
-
-        function nextTrack() { if(songs.length) loadSong((currentSongIndex + 1) % songs.length); }
-        function prevTrack() { if(songs.length) loadSong((currentSongIndex - 1 + songs.length) % songs.length); }
-
-        audio.addEventListener('ended', nextTrack);
-        audio.addEventListener('timeupdate', () => { progressBar.max = audio.duration; progressBar.value = audio.currentTime; });
-        progressBar.addEventListener('input', () => audio.currentTime = progressBar.value);
-        document.getElementById('volumeControl').addEventListener('input', (e) => audio.volume = e.target.value);
+        audio.ontimeupdate = () => {
+            document.getElementById('progress').max = audio.duration;
+            document.getElementById('progress').value = audio.currentTime;
+        };
+        document.getElementById('progress').oninput = (e) => audio.currentTime = e.target.value;
+        document.getElementById('vol').oninput = (e) => audio.volume = e.target.value;
+        audio.onended = next;
     </script>
 </body>
 </html>
 """
 
-st.title("🎧 MP3 Player : อยู่นิ้งๆไม่เจ็บตัว Edition")
-st.write("เพิ่มเพลง ปรับเบส เปลี่ยนสีไฟ ได้ครบในแอปเดียว!")
-
-components.html(html_code, height=650)
+st.markdown("<h1 style='text-align: center;'>⚡ MP3 THE LEGEND</h1>", unsafe_allow_html=True)
+components.html(html_code, height=750)
