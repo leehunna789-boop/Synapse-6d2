@@ -1,46 +1,45 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. ตั้งค่าหน้าจอ
 st.set_page_config(page_title="Legendary MP3 Player", layout="wide")
 
-# 2. ผ้าคลุมล่องหน (ซ่อนทุกอย่างขวาล่างให้กริบ)
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stDeployButton {display:none !important;}
-            #stDecoration {display:none !important;}
-            [data-testid="stStatusWidget"] {display:none !important;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+# ส่วนซ่อนปุ่ม Streamlit
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none !important;}
+    #stDecoration {display:none !important;}
+    [data-testid="stStatusWidget"] {display:none !important;}
+    </style>
+""", unsafe_allow_html=True)
 
-# 3. ตัวเครื่องเล่นชุดเต็ม
 html_code = """
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <style>
         :root { --neon: #00ff88; --bg: #050505; --border-width: 10px; }
-        body { background-color: var(--bg); color: white; font-family: 'Orbitron', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .player-box {
             background: #111; border: var(--border-width) solid var(--neon);
-            border-radius: 60px; padding: 40px; width: 350px; text-align: center;
+            border-radius: 50px; padding: 40px; width: 320px; text-align: center;
             box-shadow: 0 0 50px rgba(0, 255, 136, 0.2);
         }
         .knob-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; background: #1a1a1a; padding: 15px; border-radius: 25px; }
-        .btn-main { background: var(--neon); border: none; width: 75px; height: 75px; border-radius: 50%; font-size: 2rem; cursor: pointer; box-shadow: 0 0 20px var(--neon); }
+        .btn-main { background: var(--neon); border: none; width: 80px; height: 80px; border-radius: 50%; font-size: 2.5rem; cursor: pointer; box-shadow: 0 0 20px var(--neon); }
         .slider { width: 100%; accent-color: var(--neon); cursor: pointer; }
-        .playlist { margin-top: 20px; max-height: 100px; overflow-y: auto; font-size: 0.8rem; text-align: left; border-top: 1px solid #333; }
+        .playlist { margin-top: 20px; max-height: 120px; overflow-y: auto; text-align: left; font-size: 0.85rem; border-top: 1px solid #333; padding-top: 10px; }
+        .song-item { padding: 8px; cursor: pointer; border-radius: 5px; margin-bottom: 2px; }
+        .song-item:hover { background: #222; }
     </style>
 </head>
 <body>
     <div class="player-box">
-        <h2 style="color:var(--neon); margin-bottom:5px;">เสียง...</h2>
-        <div id="trackName" style="font-size:0.8rem; margin-bottom:15px; color:#888;">ยังไม่มีเพลง...</div>
+        <h2 style="color:var(--neon); margin:0;">เสียง...</h2>
+        <div id="trackName" style="font-size:0.9rem; margin:15px 0; color:#aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">รอเลือกเพลง...</div>
         
         <div class="knob-container">
             <div><small style="color:var(--neon)">BASS</small><input type="range" id="bass" class="slider" min="0" max="20" value="0"></div>
@@ -49,70 +48,114 @@ html_code = """
 
         <input type="range" id="progress" class="slider" value="0">
         
-        <div style="display:flex; justify-content: space-around; align-items: center; margin: 15px 0;">
-            <button onclick="prev()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">⏮</button>
+        <div style="display:flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <button onclick="prev()" style="background:none; border:none; color:white; font-size:1.8rem; cursor:pointer;">⏮</button>
             <button id="playBtn" class="btn-main" onclick="toggle()">▶</button>
-            <button onclick="next()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">⏭</button>
+            <button onclick="next()" style="background:none; border:none; color:white; font-size:1.8rem; cursor:pointer;">⏭</button>
         </div>
 
-        <label style="display: block; cursor: pointer; color: var(--neon); font-size:0.9rem; border: 1px dashed var(--neon); padding: 10px; border-radius: 15px;">
+        <label style="display: block; cursor: pointer; color: var(--neon); font-weight:bold; border: 2px solid var(--neon); padding: 12px; border-radius: 20px;">
             <input type="file" id="files" multiple accept="audio/*" style="display:none;">
-            [ + เลือกเพลงเข้าเครื่อง ]
+            [ + อัปโหลดเพลง ]
         </label>
+        
         <div id="list" class="playlist"></div>
     </div>
 
-    <audio id="audio"></audio>
+    <audio id="audioTag"></audio>
 
     <script>
-        const audio = document.getElementById('audio');
-        let songs = []; let current = 0;
+        const audio = document.getElementById('audioTag');
+        const playBtn = document.getElementById('playBtn');
+        const trackNameDisp = document.getElementById('trackName');
+        const listDisp = document.getElementById('list');
+        
+        let songs = [];
+        let currentIdx = 0;
         let audioCtx, bassNode, gainNode, source;
 
-        function init() {
+        function initAudio() {
             if (audioCtx) return;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             bassNode = audioCtx.createBiquadFilter();
-            bassNode.type = "lowshelf"; bassNode.frequency.value = 200;
+            bassNode.type = "lowshelf";
+            bassNode.frequency.value = 200;
             gainNode = audioCtx.createGain();
             source = audioCtx.createMediaElementSource(audio);
             source.connect(bassNode).connect(gainNode).connect(audioCtx.destination);
         }
 
         document.getElementById('files').onchange = (e) => {
-            init();
+            initAudio();
             const f = Array.from(e.target.files);
-            f.forEach(file => songs.push({name: file.name, url: URL.createObjectURL(file)}));
-            if(!audio.src) load(0);
-            updateList();
+            f.forEach(file => {
+                songs.push({ name: file.name, url: URL.createObjectURL(file) });
+            });
+            if (songs.length > 0 && !audio.src) {
+                loadSong(0);
+            }
+            updatePlaylistUI();
         };
 
-        function load(i) {
-            current = i; audio.src = songs[i].url;
-            document.getElementById('trackName').innerText = songs[i].name;
-            play();
+        function loadSong(index) {
+            currentIdx = index;
+            audio.src = songs[index].url;
+            trackNameDisp.innerText = songs[index].name;
+            updatePlaylistUI();
+            playAudio();
         }
 
-        function toggle() { audio.paused ? play() : pause(); }
-        function play() { if(audioCtx.state==='suspended') audioCtx.resume(); audio.play(); document.getElementById('playBtn').innerText='⏸'; }
-        function pause() { audio.pause(); document.getElementById('playBtn').innerText='▶'; }
-        function next() { if(songs.length) load((current+1)%songs.length); }
-        function prev() { if(songs.length) load((current-1+songs.length)%songs.length); }
-
-        function updateList() {
-            document.getElementById('list').innerHTML = songs.map((s,i) => 
-                `<div onclick="load(${i})" style="padding:5px; color:${i===current?var(--neon):'#666'}">${i+1}. ${s.name}</div>`
-            ).join('');
+        function toggle() {
+            if (!audio.src) return;
+            audio.paused ? playAudio() : pauseAudio();
         }
 
-        document.getElementById('bass').oninput = (e) => bassNode.gain.value = e.target.value;
-        document.getElementById('gain').oninput = (e) => gainNode.gain.value = e.target.value;
-        audio.ontimeupdate = () => { document.getElementById('progress').max = audio.duration; document.getElementById('progress').value = audio.currentTime; };
-        document.getElementById('progress').oninput = (e) => audio.currentTime = e.target.value;
+        function playAudio() {
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            audio.play();
+            playBtn.innerText = '⏸';
+        }
+
+        function pauseAudio() {
+            audio.pause();
+            playBtn.innerText = '▶';
+        }
+
+        function next() {
+            if (songs.length === 0) return;
+            loadSong((currentIdx + 1) % songs.length);
+        }
+
+        function prev() {
+            if (songs.length === 0) return;
+            loadSong((currentIdx - 1 + songs.length) % songs.length);
+        }
+
+        function updatePlaylistUI() {
+            listDisp.innerHTML = songs.map((s, i) => `
+                <div class="song-item" onclick="loadSong(${i})" style="color: ${i === currentIdx ? '#00ff88' : '#888'}">
+                    ${i + 1}. ${s.name}
+                </div>
+            `).join('');
+        }
+
+        // ปรับแต่งเสียง
+        document.getElementById('bass').oninput = (e) => { if(bassNode) bassNode.gain.value = e.target.value; };
+        document.getElementById('gain').oninput = (e) => { if(gainNode) gainNode.gain.value = e.target.value; };
+        
+        // Progress Bar
+        audio.ontimeupdate = () => {
+            const prog = document.getElementById('progress');
+            prog.max = audio.duration || 0;
+            prog.value = audio.currentTime;
+        };
+        document.getElementById('progress').oninput = (e) => {
+            audio.currentTime = e.target.value;
+        };
         audio.onended = next;
     </script>
 </body>
 </html>
 """
 
-components.html(html_code, height=800)
+components.html(html_code, height=850)
