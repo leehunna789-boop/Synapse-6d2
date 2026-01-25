@@ -9,3 +9,12 @@ numpy
 soundfile
 pydub
 praat-parselmouth
+streamlit
+numpy
+pandas
+google-generativeai
+librosa
+soundfile
+pydub
+praat-parselmouth
+pyworld
