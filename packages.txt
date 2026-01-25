@@ -1,3 +1,20 @@
 libsndfile1-dev
 libsndfile1
 ffmpeg
+# --- ระบบหลักและการแสดงผล ---
+streamlit
+pandas
+numpy
+
+# --- สมองกล AI ---
+google-generativeai
+
+# --- ขุมพลังวิเคราะห์และประมวลผลเสียง (Audio Engine) ---
+librosa
+praat-parselmouth
+pyworld
+soundfile
+pydub
+
+# --- ส่วนเสริม (ถ้าจำเป็นต้องใช้จัดการไฟล์) ---
+scipy
