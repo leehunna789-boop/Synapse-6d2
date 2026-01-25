@@ -38,7 +38,7 @@ html_code = """
 </head>
 <body>
     <div class="player-box">
-        <h2 style="color:var(--neon); margin:0;">เสียง...</h2>
+        <h2 style="color:var(--neon); margin:0;">MUSIC.อยู่นิ้งๆไม่เจ็บตัว...</h2>
         <div id="trackName" style="font-size:0.9rem; margin:15px 0; color:#aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">รอเลือกเพลง...</div>
         
         <div class="knob-container">
