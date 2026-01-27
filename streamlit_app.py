@@ -31,11 +31,11 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- [ส่วนที่ 3: ฟังก์ชันส่งแจ้งเตือนแบบ Messaging API (ตัวใหม่)] ---
+# --- [ส่วนที่ 3: ฟังก์ชันส่งแจ้งเตือนแบบ Messaging API (4e96e8ceae54b81574dda897e7485faf)] ---
 def send_push_notification(name, song):
     # 🚩 ต้องเอาค่า 2 อย่างนี้มาจาก LINE Developers Console
-    channel_access_token = "ใส่_CHANNEL_ACCESS_TOKEN_ของคุณตรงนี้"
-    user_id = "ใส่_USER_ID_ของคุณตรงนี้"
+    channel_access_token = "ใส่_CHANNEL_ACCESS_TOKEN_4e96e8ceae54b81574dda897e7485faf"
+    user_id = "ใส่_USER_ID_Ue7f8a054589e2d2996aae61dec7bf56c"
     
     url = 'https://api.line.me/v2/bot/message/push'
     headers = {
