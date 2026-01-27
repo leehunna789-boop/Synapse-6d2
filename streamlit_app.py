@@ -21,13 +21,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- [ส่วนที่ 2: เชื่อมต่อ Firebase] ---
+# แก้ส่วนเชื่อมต่อ Firebase ใน app.py
 if not firebase_admin._apps:
-    try:
-        # ใช้ชื่อ 'sooksun1' ตามที่คุณตั้งใน Secrets
-        key_dict = st.secrets["sooksun1"]
-        cred = credentials.Certificate(dict(key_dict))
-        firebase_admin.initialize_app(cred)
+    key_dict = st.secrets["sooksun1"] # เรียกชื่อตาม [header] ใน Secrets
+    cred = credentials.Certificate(dict(key_dict))
+    firebase_admin.initialize_app(cred)
     except Exception as e:
         st.error(f"เชื่อมต่อฐานข้อมูลไม่ได้: {e}")
 
