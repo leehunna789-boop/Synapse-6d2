@@ -39,7 +39,7 @@ def send_push_notification(name, song):
 
 # --- [ส่วนแสดงหน้าเว็บ Streamlit] ---
 st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว'")
-st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
+st.video("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=LOTPiIS-KG5uLAwD") 
 
 with st.form("song_request", clear_on_submit=True):
     u_name = st.text_input("ชื่อของคุณ")
