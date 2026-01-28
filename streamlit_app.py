@@ -49,7 +49,7 @@ def send_push_notification(name, song):
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     payload = {
         "to": uid,
-        "messages":
+        "messages":[sooksun1]
     }
     try:
         requests.post(url, headers=headers, json=payload)
