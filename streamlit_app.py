@@ -3,22 +3,8 @@ import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
 import datetime
-# เพิ่ม import ที่ด้านบนสุดของไฟล์
-from streamlit_player import st_player # เพิ่มบรรทัดนี้ที่ส่วน import ด้านบน
-
-# ... (โค้ดส่วนอื่นๆ ข้ามไป) ...
-
-# --- [Layout หน้าเว็บ] ---
-# ... (โค้ด Sidebar และ Columns ข้ามไป) ...
-
-with col_left:
-    st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
-    
-    # เปลี่ยนจาก st.video เป็น st_player
-    st_player("https://youtube.com")
-    # st.video("https://youtube.com") # ลบบรรทัดนี้ หรือคอมเมนต์ไว้
-    
-# ... (โค้ดส่วนอื่นๆ ด้านล่างข้ามไป) ...
+# ต้อง import library นี้เพิ่ม
+from streamlit_player import st_player 
 
 # --- [ตั้งค่าหน้าเว็บ] ---
 st.set_page_config(page_title="สถานีอยู่นิ่งๆ ไม่เจ็บตัว", page_icon="📻", layout="wide")
@@ -56,13 +42,14 @@ db = firestore.client()
 
 # --- [ส่วนฟังก์ชันส่ง LINE] ---
 def send_push_notification(name, song):
+    # ตรวจสอบ URL ของ Line Messaging API ว่าต้องเป็น v2/bot/message/push
     token = "4e96e8ceae54b81574dda897e7485faf"
     uid = "Ue7f8a054589e2d2996aae61dec7bf56c"
     url = 'https://api.line.me'
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     payload = {
         "to": uid,
-        "messages": [{"type": "text", "text": f"📢 ขอเพลงใหม่!\n👤 จาก: {name}\n🎵 เพลง: {song}"}]
+        "messages":
     }
     try:
         requests.post(url, headers=headers, json=payload)
@@ -72,7 +59,8 @@ def send_push_notification(name, song):
 # --- [Layout หน้าเว็บ] ---
 # ใช้ Sidebar เก็บรายละเอียดเล็กๆ
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com", width=100)
+    # แก้ URL รูปภาพโลโก้ให้ถูกต้อง
+    st.image("https://cdn-icons-png.flaticon.com", width=100) 
     st.title("About Station")
     st.write("ยินดีต้อนรับสู่สถานีเพลงที่เงียบที่สุด (เพราะเราอยู่นิ่งๆ)")
     st.info("ส่งคำขอเพลงได้ตลอด 24 ชม.")
@@ -82,7 +70,9 @@ col_left, col_right = st.columns([1.5, 1])
 
 with col_left:
     st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
-    st.video("https://youtube.com") 
+    
+    # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้อง
+    st_player("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=jumIfkCC6k_klJas") 
 
 with col_right:
     st.subheader("🎵 ส่งคำขอเพลง")
@@ -104,7 +94,7 @@ with col_right:
             else:
                 st.warning("กรุณากรอกข้อมูลให้ครบด้วยครับ")
 
-# --- [ส่วนแสดงประวัติการขอเพลง (สวยขึ้น)] ---
+# --- [ส่วนแสดงประวัติการขอเพลง] ---
 st.write("---")
 st.subheader("📜 5 รายการขอเพลงล่าสุด")
 
