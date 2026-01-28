@@ -72,7 +72,7 @@ with col_left:
     st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
     
     # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้อง
-    st_player("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=jumIfkCC6k_klJas") 
+    st_player("https://youtube.com") 
 
 with col_right:
     st.subheader("🎵 ส่งคำขอเพลง")
