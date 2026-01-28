@@ -42,25 +42,35 @@ db = firestore.client()
 
 # --- [ส่วนฟังก์ชันส่ง LINE] ---
 def send_push_notification(name, song):
-    # ตรวจสอบ URL ของ Line Messaging API ว่าต้องเป็น v2/bot/message/push
-    token = "4e96e8ceae54b81574dda897e7485faf"
-    uid = "Ue7f8a054589e2d2996aae61dec7bf56c"
+    # ดึง Token และ User ID จาก Streamlit secrets ตามที่ปรากฏในภาพ
+    # สมมติว่า key ใน secrets.toml คือ [google_apis.com]
+    token = st.secrets["google_apis.com"]["channel_access_token"] 
+    uid = st.secrets["google_apis.com"]["user_id"]
+    
+    # URL ปลายทางที่ถูกต้องของ LINE Push Message API
     url = 'https://api.line.me'
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
+    
+    # สร้าง Payload สำหรับส่งข้อความ Text message พร้อมข้อมูลที่ผู้ใช้กรอก
     payload = {
         "to": uid,
-        "messages":[sooksun1]
+        "messages":
     }
+    
     try:
-        requests.post(url, headers=headers, json=payload)
-    except:
-        pass
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            print("Message sent successfully!")
+        else:
+            print(f"Failed to send message: {response.status_code} - {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"Network Error sending LINE notification: {e}")
 
 # --- [Layout หน้าเว็บ] ---
 # ใช้ Sidebar เก็บรายละเอียดเล็กๆ
 with st.sidebar:
     # แก้ URL รูปภาพโลโก้ให้ถูกต้อง
-    st.image("https://cdn-icons-png.flaticon.com", width=100) 
+    st.image("https://cdn-icons-png.flaticon.com", width=100) # แก้ URL รูปภาพโลโก้
     st.title("About Station")
     st.write("ยินดีต้อนรับสู่สถานีเพลงที่เงียบที่สุด (เพราะเราอยู่นิ่งๆ)")
     st.info("ส่งคำขอเพลงได้ตลอด 24 ชม.")
@@ -71,7 +81,7 @@ col_left, col_right = st.columns([1.5, 1])
 with col_left:
     st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
     
-    # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้อง
+    # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้องของคุณ
     st_player("https://youtube.com") 
 
 with col_right:
@@ -83,12 +93,14 @@ with col_right:
         
         if submit:
             if u_name and u_song:
+                # บันทึกข้อมูลลง Firestore
                 db.collection('requests').add({
                     'name': u_name,
                     'song': u_song,
                     'time': datetime.datetime.now()
                 })
-                send_push_notification(u_name, u_song)
+                # ส่งแจ้งเตือน LINE ด้วยชื่อและเพลงที่ผู้ใช้กรอก
+                send_push_notification(u_name, u_song) 
                 st.balloons() # เพิ่มเอฟเฟกต์ลูกโป่งตอนส่งสำเร็จ
                 st.success("ส่งเรียบร้อย! ดีเจได้รับข้อมูลแล้ว")
             else:
