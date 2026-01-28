@@ -21,3 +21,5 @@ pyworld
 streamlit
 firebase-admin
 requests
+streamlit-player
+
