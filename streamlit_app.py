@@ -48,7 +48,7 @@ def send_push_notification(name, song):
     uid = st.secrets["google_apis.com"]["user_id"]
     
     # URL ปลายทางที่ถูกต้องของ LINE Push Message API
-    url = 'https://api.line.me'
+    url = 'https://api.line.me' # <-- แก้ URL ตรงนี้
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     
     # สร้าง Payload สำหรับส่งข้อความ Text message พร้อมข้อมูลที่ผู้ใช้กรอก
@@ -82,7 +82,7 @@ with col_left:
     st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
     
     # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้องของคุณ
-    st_player("https://youtube.com") 
+    st_player("https://youtube.com") # <-- ใส่ลิ้งก์ Playlist ที่นี่
 
 with col_right:
     st.subheader("🎵 ส่งคำขอเพลง")
