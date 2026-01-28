@@ -38,7 +38,7 @@ def send_push_notification(name, song):
         pass
 
 # --- [ส่วนแสดงหน้าเว็บ Streamlit] ---
-st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว'")
+st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
 st.video("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=LOTPiIS-KG5uLAwD") 
 
 with st.form("song_request", clear_on_submit=True):
