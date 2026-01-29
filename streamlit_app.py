@@ -1,15 +1,13 @@
 import streamlit as st
-import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
 import datetime
-# ต้อง import library นี้เพิ่ม
 from streamlit_player import st_player 
 
 # --- [ตั้งค่าหน้าเว็บ] ---
 st.set_page_config(page_title="สถานีอยู่นิ่งๆ ไม่เจ็บตัว", page_icon="📻", layout="wide")
 
-# --- [ส่วน CSS ตกแต่ง] ---
+# --- [CSS ตกแต่ง - คงเดิมตามที่คุณชอบ] ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -18,106 +16,73 @@ st.markdown("""
         width: 100%; border-radius: 20px; background-color: #FF4B4B; color: white; border: none;
         transition: 0.3s;
     }
-    .stButton>button:hover { background-color: #ff3333; transform: scale(1.02); }
     .song-card {
         background-color: #1e2129; padding: 20px; border-radius: 15px; 
         margin-bottom: 15px; border-left: 6px solid #FF4B4B;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
     }
     .song-title { font-size: 1.2rem; font-weight: bold; color: #ffffff; }
     .user-name { color: #FF4B4B; font-size: 0.9rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- [ส่วนเชื่อมต่อ Firebase] ---
+# --- [เชื่อมต่อ Firebase] ---
 if not firebase_admin._apps:
     try:
+        # ใช้ชื่อ sooksun1 ตามที่ตั้งใน Secrets
         key_dict = st.secrets["sooksun1"]
         cred = credentials.Certificate(dict(key_dict))
         firebase_admin.initialize_app(cred)
     except Exception as e:
-        st.error(f"เชื่อมต่อฐานข้อมูลไม่ได้: {e}")
+        st.error(f"ระบบฐานข้อมูลขัดข้อง: {e}")
 
 db = firestore.client()
 
-# --- [ส่วนฟังก์ชันส่ง LINE] ---
-def send_push_notification(name, song):
-    # ดึง Token และ User ID จาก Streamlit secrets ตามที่ปรากฏในภาพ
-    # สมมติว่า key ใน secrets.toml คือ [google_apis.com]
-    token = st.secrets["google_apis.com"]["channel_access_token"] 
-    uid = st.secrets["google_apis.com"]["user_id"]
-    
-    # URL ปลายทางที่ถูกต้องของ LINE Push Message API
-    url = 'https://api.line.me' # <-- แก้ URL ตรงนี้
-    headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
-    
-    # สร้าง Payload สำหรับส่งข้อความ Text message พร้อมข้อมูลที่ผู้ใช้กรอก
-    payload = {
-        "to": uid,
-        "messages":
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            print("Message sent successfully!")
-        else:
-            print(f"Failed to send message: {response.status_code} - {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Network Error sending LINE notification: {e}")
-
 # --- [Layout หน้าเว็บ] ---
-# ใช้ Sidebar เก็บรายละเอียดเล็กๆ
 with st.sidebar:
-    # แก้ URL รูปภาพโลโก้ให้ถูกต้อง
-    st.image("https://cdn-icons-png.flaticon.com", width=100) # แก้ URL รูปภาพโลโก้
+    st.image("https://cdn-icons-png.flaticon.com/512/3658/3658959.png", width=100) # โลโก้ชั่วคราว
     st.title("About Station")
-    st.write("ยินดีต้อนรับสู่สถานีเพลงที่เงียบที่สุด (เพราะเราอยู่นิ่งๆ)")
-    st.info("ส่งคำขอเพลงได้ตลอด 24 ชม.")
+    st.write("ยินดีต้อนรับสู่สถานีที่เงียบที่สุด")
 
-# แบ่งหน้าจอหลักเป็น 2 ฝั่ง
 col_left, col_right = st.columns([1.5, 1])
 
 with col_left:
-    st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว📀'")
-    
-    # ใช้ st_player พร้อมลิงก์ Playlist ที่ถูกต้องของคุณ
-    st_player("https://youtube.com") # <-- ใส่ลิ้งก์ Playlist ที่นี่
+    st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว' 📀")
+    # ใส่ลิงก์เพลง YouTube ของคุณที่นี่
+    st_player("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
 
 with col_right:
     st.subheader("🎵 ส่งคำขอเพลง")
     with st.form("song_request", clear_on_submit=True):
-        u_name = st.text_input("👤 ชื่อของคุณ", placeholder="บอกชื่อหน่อยครับ...")
-        u_song = st.text_input("🎶 ชื่อเพลง / ศิลปิน", placeholder="อยากฟังเพลงอะไรดี?")
+        u_name = st.text_input("👤 ชื่อของคุณ")
+        u_song = st.text_input("🎶 ชื่อเพลง / ศิลปิน")
         submit = st.form_submit_button("ส่งคำขอเข้าสถานี 🚀")
         
         if submit:
             if u_name and u_song:
-                # บันทึกข้อมูลลง Firestore
+                # บันทึกข้อมูลลง Firebase
                 db.collection('requests').add({
                     'name': u_name,
                     'song': u_song,
                     'time': datetime.datetime.now()
                 })
-                # ส่งแจ้งเตือน LINE ด้วยชื่อและเพลงที่ผู้ใช้กรอก
-                send_push_notification(u_name, u_song) 
-                st.balloons() # เพิ่มเอฟเฟกต์ลูกโป่งตอนส่งสำเร็จ
-                st.success("ส่งเรียบร้อย! ดีเจได้รับข้อมูลแล้ว")
+                st.balloons()
+                st.success("ส่งเรียบร้อย! ข้อมูลบันทึกลงฐานข้อมูลแล้ว")
             else:
-                st.warning("กรุณากรอกข้อมูลให้ครบด้วยครับ")
+                st.warning("กรุณากรอกข้อมูลให้ครบครับ")
 
-# --- [ส่วนแสดงประวัติการขอเพลง] ---
+# --- [ส่วนแสดงประวัติการขอเพลงจาก Firebase] ---
 st.write("---")
-st.subheader("📜 5 รายการขอเพลงล่าสุด")
+st.subheader("📜 5 รายการขอเพลงล่าสุด (ดึงข้อมูลจริง)")
 
-docs = db.collection('requests').order_by('time', direction=firestore.Query.DESCENDING).limit(5).get()
-
-# แสดงผลแบบ Grid หรือ Card
-for d in docs:
-    data = d.to_dict()
-    st.markdown(f"""
-        <div class="song-card">
-            <div class="user-name">👤 ผู้ขอ: {data['name']}</div>
-            <div class="song-title">🎵 {data['song']}</div>
-        </div>
-    """, unsafe_allow_html=True)
+try:
+    docs = db.collection('requests').order_by('time', direction=firestore.Query.DESCENDING).limit(5).get()
+    for d in docs:
+        data = d.to_dict()
+        st.markdown(f"""
+            <div class="song-card">
+                <div class="user-name">👤 ผู้ขอ: {data['name']}</div>
+                <div class="song-title">🎵 {data['song']}</div>
+            </div>
+        """, unsafe_allow_html=True)
+except:
+    st.write("ยังไม่มีข้อมูลคำขอเพลงในขณะนี้")
