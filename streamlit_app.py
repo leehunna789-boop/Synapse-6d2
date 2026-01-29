@@ -48,7 +48,7 @@ col_left, col_right = st.columns([1.5, 1])
 with col_left:
     st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว' 📀")
     # ใส่ลิงก์เพลง YouTube ของคุณที่นี่
-    st_player("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
+    st_player("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=uD6o96DY8XjOrMsW") 
 
 with col_right:
     st.subheader("🎵 ส่งคำขอเพลง")
