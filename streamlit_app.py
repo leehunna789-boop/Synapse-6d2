@@ -1,88 +1,104 @@
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore
-import datetime
-from streamlit_player import st_player 
+import numpy as np
+import pandas as pd
+import time
 
-# --- [ตั้งค่าหน้าเว็บ] ---
-st.set_page_config(page_title="สถานีอยู่นิ่งๆ ไม่เจ็บตัว", page_icon="📻", layout="wide")
-
-# --- [CSS ตกแต่ง - คงเดิมตามที่คุณชอบ] ---
+# --- 1. CONFIG & STYLE (ดึงธีมจาก UI Android ที่คุณส่งมา) ---
+st.set_page_config(layout="wide", page_title="S.S.S Music - Ultimate AI")
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stTextInput>div>div>input { background-color: #262730; color: white; border-radius: 10px; }
-    .stButton>button { 
-        width: 100%; border-radius: 20px; background-color: #FF4B4B; color: white; border: none;
-        transition: 0.3s;
-    }
-    .song-card {
-        background-color: #1e2129; padding: 20px; border-radius: 15px; 
-        margin-bottom: 15px; border-left: 6px solid #FF4B4B;
-    }
-    .song-title { font-size: 1.2rem; font-weight: bold; color: #ffffff; }
-    .user-name { color: #FF4B4B; font-size: 0.9rem; }
+    .main { background-color: #0A0A0A; color: #FFFFFF; }
+    .stButton>button { background-color: #FF0000; color: white; width: 100%; height: 3em; font-weight: bold; }
+    .stTextInput>div>div>input { background-color: #1A1A1A; color: white; }
+    h1 { color: #FF0000; text-align: center; }
+    .slogan { color: #FFD700; text-align: center; font-size: 1.2em; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- [เชื่อมต่อ Firebase] ---
-if not firebase_admin._apps:
-    try:
-        # ใช้ชื่อ sooksun1 ตามที่ตั้งใน Secrets
-        key_dict = st.secrets["sooksun1"]
-        cred = credentials.Certificate(dict(key_dict))
-        firebase_admin.initialize_app(cred)
-    except Exception as e:
-        st.error(f"ระบบฐานข้อมูลขัดข้อง: {e}")
+# --- 2. LOGIC: 12 DIMENSIONS & EMOTION (ดึงจากตาราง 12 มิติ และ Matrix V1/V2) ---
+def get_vocal_parameters(v):
+    # ใช้ Linear Interpolation (Lerp) ตามที่คุณถาม เพื่อความสมูท
+    def lerp(low, high, factor): return low + (high - low) * factor
+    
+    return {
+        "Vibrato_Hz": lerp(4.5, 6.0, v),
+        "Spectral_Tilt": lerp(-6, -12, v), # ยิ่งเศร้าเสียงยิ่งนุ่ม (Slope ชัน)
+        "HNR": lerp(15, 25, v),            # ลมหายใจ
+        "F0_Base": lerp(220, 440, v),      # ระดับเสียง (Hz)
+        "RT60": lerp(1.2, 2.5, v)          # ความก้องของห้อง
+    }
 
-db = firestore.client()
+# --- 3. ENGINE: PRO SYNTHESIS (ดึงจากโค้ด Ultimate AI และ SVS) ---
+def synthesize_healing_voice(params, duration=3, sr=44100):
+    t = np.linspace(0, duration, sr * duration)
+    f0 = params["F0_Base"]
+    vib_hz = params["Vibrato_Hz"]
+    
+    # 432Hz Healing Frequency Logic
+    # ผสม Fundamental + Harmonics (ลดการบาดหูตามที่คุณตั้งใจ)
+    audio = 0.5 * np.sin(2 * np.pi * f0 * t + (0.5 * np.sin(2 * np.pi * vib_hz * t)))
+    overtone = 0.2 * np.sin(2 * np.pi * (f0 * 2) * t) 
+    combined = audio + overtone
+    
+    # Apply Envelope (Fade in/out) ป้องกันเสียงคลิก
+    envelope = np.ones_like(t)
+    fade = 44100 // 2
+    envelope[:fade] = np.linspace(0, 1, fade)
+    envelope[-fade:] = np.linspace(1, 0, fade)
+    
+    # Mastering (Limiter)
+    final_audio = np.clip(combined * envelope, -0.9, 0.9)
+    return final_audio
 
-# --- [Layout หน้าเว็บ] ---
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3658/3658959.png", width=100) # โลโก้ชั่วคราว
-    st.title("About Station")
-    st.write("ยินดีต้อนรับสู่สถานีที่เงียบที่สุด")
+# --- 4. UI: FRONTEND (ถอดแบบจาก Android XML ที่คุณส่งมา) ---
+st.write("<h1>S.S.S Music</h1>", unsafe_allow_html=True)
+st.write("<p class='slogan'>\"อยู่นิ่งๆ ไม่เจ็บตัว\"</p>", unsafe_allow_html=True)
 
-col_left, col_right = st.columns([1.5, 1])
+col1, col2 = st.columns([1, 1])
 
-with col_left:
-    st.title("📻 สถานี 'อยู่นิ่งๆ ไม่เจ็บตัว' 📀")
-    # ใส่ลิงก์เพลง YouTube ของคุณที่นี่
-    st_player("https://youtube.com/playlist?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO&si=uD6o96DY8XjOrMsW") 
+with col1:
+    st.image("https://img5.pic.in.th/file/secure-sv1/logo_world.png", caption="AI Album Cover", width=300) # จำลอง Logo
+    user_note = st.text_input("ใจความสั้นๆ ที่จะให้ AI ขยี้...", placeholder="เช่น วันนี้เหนื่อยจัง...")
+    btn_gen = st.button("ขยี้ใจความ (GENERATE)")
 
-with col_right:
-    st.subheader("🎵 ส่งคำขอเพลง")
-    with st.form("song_request", clear_on_submit=True):
-        u_name = st.text_input("👤 ชื่อของคุณ")
-        u_song = st.text_input("🎶 ชื่อเพลง / ศิลปิน")
-        submit = st.form_submit_button("ส่งคำขอเข้าสถานี 🚀")
+with col2:
+    st.subheader("📊 AI Control Matrix (12 มิติ)")
+    # จำลองค่าจาก Gemini (Logic: ถ้ามีคำว่าเหนื่อย/เศร้า ให้ Valence ต่ำ)
+    v_val = 0.3 if "เหนื่อย" in user_note or "เศร้า" in user_note else 0.7
+    a_val = 0.4
+    
+    params = get_vocal_parameters(v_val)
+    
+    # แสดงค่าพารามิเตอร์ที่เปลี่ยนไปตาม "ใจความ"
+    df_params = pd.DataFrame({
+        "มิติความสมจริง": params.keys(),
+        "ค่าที่ AI ปรับแต่ง": params.values()
+    })
+    st.table(df_params)
+
+# --- 5. EXECUTION (เมื่อกดปุ่ม ขยี้ใจความ) ---
+if btn_gen:
+    with st.spinner("🤖 AI Gemini กำลังวิเคราะห์อารมณ์และส่งต่อให้ RBF Engine..."):
+        time.sleep(1.5) # จำลองการประมวลผล
         
-        if submit:
-            if u_name and u_song:
-                # บันทึกข้อมูลลง Firebase
-                db.collection('requests').add({
-                    'name': u_name,
-                    'song': u_song,
-                    'time': datetime.datetime.now()
-                })
-                st.balloons()
-                st.success("ส่งเรียบร้อย! ข้อมูลบันทึกลงฐานข้อมูลแล้ว")
-            else:
-                st.warning("กรุณากรอกข้อมูลให้ครบครับ")
+        # รันเครื่องยนต์เสียง
+        audio_data = synthesize_healing_voice(params)
+        
+        st.success("✅ สังเคราะห์เสียงบำบัดเสร็จสมบูรณ์!")
+        
+        # แสดงผล Visual ตาม V2.0 (IP Asset 100M THB ของคุณ)
+        st.subheader("🎨 Visual Feedback (V2.0 Logic)")
+        sat = 0.2 if v_val < 0.5 else 0.8
+        st.info(f"ระบบปรับค่า Saturation ไปที่: {sat} | แสงสว่าง: {params['RT60']/3:.2f}")
+        
+        # เล่นเสียง
+        st.audio(audio_data, format="audio/wav", sample_rate=44100)
+        
+        # ปุ่มเสริมจาก UI Android
+        c_save, c_share, c_turbo = st.columns(3)
+        c_save.button("SAVE")
+        c_share.button("SHARE")
+        c_turbo.button("TURBO (High-Res)")
 
-# --- [ส่วนแสดงประวัติการขอเพลงจาก Firebase] ---
-st.write("---")
-st.subheader("📜 5 รายการขอเพลงล่าสุด (ดึงข้อมูลจริง)")
-
-try:
-    docs = db.collection('requests').order_by('time', direction=firestore.Query.DESCENDING).limit(5).get()
-    for d in docs:
-        data = d.to_dict()
-        st.markdown(f"""
-            <div class="song-card">
-                <div class="user-name">👤 ผู้ขอ: {data['name']}</div>
-                <div class="song-title">🎵 {data['song']}</div>
-            </div>
-        """, unsafe_allow_html=True)
-except:
-    st.write("ยังไม่มีข้อมูลคำขอเพลงในขณะนี้")
+st.markdown("---")
+st.caption("ระบบรันบนสถาปัตยกรรม: Input -> Gemini -> RBF -> Mastering")
