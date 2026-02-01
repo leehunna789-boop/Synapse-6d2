@@ -1,6 +1,6 @@
+streamlit>=1.35.0
+google-generativeai>=0.8.3
 pyworld
-streamlit
-google-generativeai
 pygame
 pandas
 kivy
@@ -9,10 +9,6 @@ numpy
 soundfile
 pydub
 praat-parselmouth
-numpy
-pandas
 firebase-admin
 requests
 streamlit-player
-google-generativeai>=0.8.3
-streamlit>=1.35.0
