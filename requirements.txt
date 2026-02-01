@@ -22,4 +22,4 @@ streamlit
 firebase-admin
 requests
 streamlit-player
-
+google-generativeai>=0.8.3
