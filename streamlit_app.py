@@ -11,7 +11,7 @@ try:
     my_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=my_key)
     # แก้ไขชื่อโมเดลเป็น models/ เพื่อลดโอกาสเกิด Error 404
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 except Exception as e:
     st.error("⚠️ ไม่พบกุญแจลับในระบบ Secrets หรือกุญแจผิดพลาด")
     model = None
