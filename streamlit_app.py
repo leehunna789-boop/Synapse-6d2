@@ -115,11 +115,11 @@ with v_col2:
 st.write("---")
 st.markdown("### 🎵 Additional Healing Channels")
 yt_links = [
-    "https://www.youtube.com/embed/videoseries?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO",
-    "https://www.youtube.com/watch?v=Bb3Jtsik3nY",
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "https://www.youtube.com/watch?v=yK1lT73hI9g",
-    "https://www.youtube.com/watch?v=5qap5aO4i9A"
+    "https://youtube.com/shorts/11hzDIAPHKU?si=uPyoZWKFeJelxyDX",
+    "https://youtube.com/shorts/JdDIbhiMft8?si=Eh-X37uZgJugJBWa",
+    "https://youtube.com/shorts/4529wwOotw4?si=e3rSAznjwV9V-gzd",
+    "https://youtube.com/shorts/f3Q2YBpsfrI?si=mjgAXy2c6_p1mJD9",
+    "https://youtube.com/shorts/AsRuEFu0qAQ?si=d-VXsB0q9OEfP2l6"
 ]
 
 yt_tabs = st.tabs(["CH 1", "CH 2", "CH 3", "CH 4", "CH 5"])
@@ -136,10 +136,10 @@ with u_col2:
     st.file_uploader("🎥 อัปโหลดวิดีโอส่วนตัว", type=["mp4"])
 
 st.link_button("🔵 แชร์ความรู้สึกไปยัง Facebook", "https://www.facebook.com")
-st.link_button("🟢 แชทกับดีเจบอล (LINE)", "https://line.me")
+st.link_button("🟢 แชทกับดีเจต๊ะ (LINE)", "https://line.me")
 
 # Sidebar
-st.sidebar.image("https://via.placeholder.com/150", caption="DJ บอล ON AIR")
+st.sidebar.image("https://via.placeholder.com/150", caption="DJ ต๊ะ ON AIR")
 st.sidebar.markdown(f"**สถานะระบบ:** 🟢 ปกติ")
 st.sidebar.markdown(f"**โลจิก:** 6-Logic Active")
 st.sidebar.markdown(f"**ความถี่:** {freq} Hz")
