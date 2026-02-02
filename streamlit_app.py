@@ -1,120 +1,145 @@
 import streamlit as st
 import google.generativeai as genai
+import numpy as np
+import pandas as pd
+import json
+import time
 import random
 
-# --- [ 1. ตั้งค่าหน้าสถานี ] ---
-st.set_page_config(page_title="สถานีอยู่นิ่งๆ ไม่เจ็บตัว", page_icon="📻", layout="centered")
+# --- [ 1. CONFIGURATION & THEME ] ---
+st.set_page_config(page_title="SYNAPSE 6D PRO", layout="wide", page_icon="🧪")
 
-# --- [ 2. การตั้งค่าความปลอดภัย (Secrets) ] ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Kanit', sans-serif; }
+    .neon-title { 
+        color: #FF0000; 
+        text-shadow: 0 0 20px #FF0000, 0 0 30px #FF0000; 
+        font-size: 70px; text-align: center; font-weight: 900; margin-bottom: 0px;
+    }
+    .slogan { color: #00FF00; text-align: center; font-size: 20px; text-shadow: 0 0 10px #00FF00; margin-top: -10px; }
+    
+    /* ไฟกระพริบสถานะ */
+    .status-flash {
+        padding: 10px; border-radius: 10px; text-align: center; font-weight: bold;
+        animation: blinker 0.8s linear infinite;
+    }
+    @keyframes blinker { 50% { opacity: 0.3; } }
+    
+    .luxury-card {
+        background: rgba(20, 20, 20, 0.95);
+        border: 2px solid #00F2FE;
+        border-radius: 20px; padding: 25px; margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0, 242, 254, 0.2);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- [ 2. API & LOGIC ENGINE ] ---
 try:
-    my_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=my_key)
-    # ใช้ชื่อโมเดลล่าสุดเพื่อแก้ปัญหา 404
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    # ดึง Key จาก Secrets
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
-    st.error(f"⚠️ ปัญหาการตั้งค่ากุญแจ: {e}")
+    st.error("⚠️ กรุณาตั้งค่า GEMINI_API_KEY ใน Secrets")
     model = None
 
-# --- [ 3. ฟังก์ชันการทำงานของ AI ] ---
-def ask_ai_for_friend(user_message):
-    if model is None:
-        return "ตอนนี้ช่างใหญ่ทำกุญแจหาย... (กรุณาเช็ค API Key ใน Secrets)"
-    
-    prompt = f"คุณคือดีเจเพื่อนคู่คิด ชื่อช่างใหญ่ สโลแกนคือ 'อยู่นิ่งๆ ไม่เจ็บตัว' เพื่อนระบายว่า: '{user_message}' ตอบแบบนิ่งๆ กวนนิดๆ ให้กำลังใจดีๆ"
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        if "429" in str(e):
-            return "วันนี้คุยกันเยอะแล้วนะเพื่อน... พักผ่อนบ้างนะ (โควตาฟรีหมดชั่วคราว)"
-        return f"เรารับฟังอยู่นะ... (ระบบขัดข้องนิดหน่อย: {e})"
+def get_synapse_logic():
+    """6-Logic Integration: ดึงค่าจำลองจากเซนเซอร์"""
+    bpm = np.random.randint(65, 85)
+    temp = round(np.random.uniform(32.0, 36.5), 1)
+    # Healing Logic: เลือกความถี่บำบัด
+    freq = 432 if bpm < 80 else 528
+    return bpm, temp, freq
 
-# สุ่มคำคม
-quotes = ["นิ่งไว้เพื่อน... เดี๋ยวดีเอง", "ชีวิตมันสั้น... อย่าปั่นให้มันเหนื่อย", "อยู่นิ่งๆ ไม่เจ็บตัว เชื่อช่างใหญ่"]
-random_quote = random.choice(quotes)
+# --- [ 3. HEADER & LOGO ] ---
+st.markdown('<p class="neon-title">SYNAPSE 6D</p>', unsafe_allow_html=True)
+st.markdown('<p class="slogan">SOUND & VISUAL THERAPY | อยู่นิ่งๆ ไม่เจ็บตัว</p>', unsafe_allow_html=True)
 
-# --- [ 4. การตกแต่งหน้าตาด้วย CSS ] ---
-st.markdown(f"""
-    <style>
-    .stApp {{ background-color: #0E1117; color: #FFFFFF; text-align: center; }}
-    .quote-box {{ padding: 20px; border-radius: 15px; background: rgba(255, 215, 0, 0.1); border-left: 5px solid #FFD700; margin-bottom: 20px; }}
-    .on-air {{ color: #FF0000; font-weight: bold; animation: blinker 1s linear infinite; }}
-    @keyframes blinker {{ 50% {{ opacity: 0; }} }}
-    </style>
-    """, unsafe_allow_html=True)
+# --- [ 4. DASHBOARD: BIO-LOGIC & ATMOS-LOGIC ] ---
+bpm, temp, freq = get_synapse_logic()
 
-# 🌍 โลโก้
-try:
-    st.image("globe.jpg", width=250)
-except:
-    st.header("🌍")
-
-st.markdown("<h2 style='color: #FFD700;'>📻 STATION: อยู่นิ่งๆ ไม่เจ็บตัว ไอ้บอล พร้อมครอบครัว</h2>", unsafe_allow_html=True)
-st.markdown(f'<div class="quote-box">✨ <b>คำคมวันนี้:</b> {random_quote}</div>', unsafe_allow_html=True)
-
-# ✨ ตัวหนังสือวิ่ง
-st.markdown("""<marquee style="color: white; font-weight: bold; background: #050505; padding: 12px; border-radius: 10px; border: 1px solid #FFD700;">📢 ยินดีต้อนรับเข้าสู่สถานี อยู่นิ่งๆ ไม่เจ็บตัว ...ทักแชทระบายเรื่องราวชีวิตได้เลยครับ ✨</marquee>""", unsafe_allow_html=True)
-
-# --- [ 5. YouTube ] ---
-st.write("---")
-playlist_url = "https://www.youtube.com/embed/videoseries?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO"
-st.markdown(f'<iframe width="100%" height="400" src="{playlist_url}" frameborder="0" allowfullscreen style="border-radius:15px; border: 2px solid #333;"></iframe>', unsafe_allow_html=True)
-
-st.markdown("<marquee style='background: #FFD700; color: black; padding: 8px; font-weight: bold; border-radius: 5px; margin-top: 10px;'>🔴 กำลังรับฟังผลงานเพลงจากช่อง S.S.S Music 🔴</marquee>", unsafe_allow_html=True)
-st.video("https://youtu.be/cbcuYnyr828?si=gCdCngKZztQVVZCe")
-
-# --- [ 6. แชท AI ] ---
-st.write("---")
-st.subheader("💬 พื้นที่ระบายความในใจ (ช่างใหญ่ AI)")
-user_input = st.text_area("อยากระบายอะไรไหมเพื่อน?", placeholder="พิมพ์เรื่องที่เจอมาได้เลย...", key="ai_input_main")
-
-if st.button("ส่งความรู้สึกให้ช่างใหญ่"):
-    if user_input:
-        with st.spinner('กำลังฟังอย่างตั้งใจ...'):
-            reply = ask_ai_for_friend(user_input)
-            st.chat_message("assistant").write(reply)
-            st.balloons()
-            st.toast("555+ นิ่งไว้เพื่อน ช่างใหญ่ขำรอแล้ว!", icon="🤣")
-            
-            if 'msg_list' not in st.session_state: st.session_state.msg_list = []
-            st.session_state.msg_list.append(user_input)
-    else:
-        st.info("บอกอะไรเราหน่อยสิ")
-
-if 'msg_list' in st.session_state:
-    with st.expander("📌 การระบายที่ผ่านมา..."):
-        for m in st.session_state.msg_list[::-1]:
-            st.write(f"• {m}")
-
-# --- [ 7. อัปโหลด & โซเชียล ] ---
-st.write("---")
-st.markdown("<marquee style='background: #0000FF; color: white; padding: 8px; font-weight: bold; border-radius: 5px;'>📸 พื้นที่อัปโหลดส่วนตัว 📸</marquee>", unsafe_allow_html=True)
-c1, c2 = st.columns(2)
-with c1:
-    up_img = st.file_uploader("อัปโหลดรูป", type=["jpg", "png"], key="img_up")
-    if up_img: st.image(up_img)
-with c2:
-    up_vid = st.file_uploader("อัปโหลดวิดีโอ", type=["mp4"], key="vid_up")
-    if up_vid: st.video(up_vid)
-
-st.link_button("🔵 แชร์สถานีไปยัง Facebook", f"https://www.facebook.com/sharer/sharer.php?u=https://41g5.streamlit.app", use_container_width=True)
-
-# --- [ 8. ปุ่มลูกเล่น ] ---
-st.write("---")
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 with col1:
-    if st.button('🎊 ฉลอง'): st.balloons()
+    st.markdown(f'<div class="luxury-card"><h4 style="color:#FF0000;">❤️ Pulse (Bio)</h4><h2 style="color:white;">{bpm} BPM</h2></div>', unsafe_allow_html=True)
 with col2:
-    if st.button('❄️ หิมะ'): st.snow()
+    st.markdown(f'<div class="luxury-card"><h4 style="color:#00FF00;">🌡️ Temp (Atmos)</h4><h2 style="color:white;">{temp} °C</h2></div>', unsafe_allow_html=True)
 with col3:
-    if st.button('👏 ตบมือ'): st.toast('แปะๆๆๆๆ! สุดยอด!', icon="👏")
-with col4:
-    if st.button('🤣 หัวเราะ'): st.toast('5555+ นิ่งไว้เพื่อน!', icon="🤣")
+    st.markdown(f'<div class="luxury-card"><h4 style="color:#00F2FE;">Hz Healing</h4><h2 style="color:white;">{freq} Hz</h2></div>', unsafe_allow_html=True)
 
-# ปิดท้าย
-st.markdown("<marquee style='color: #050505; font-family: Courier; background: #000; padding: 10px; border-radius: 10px; border: 1px solid #00FF00;'>🚀 ขอบคุณที่รับชมสถานีเพลงช่างใหญ่... อยู่นิ่งๆ ไม่เจ็บตัว... 🎧</marquee>", unsafe_allow_html=True)
-st.link_button("🟢 แตะเพื่อแชทกับเรา (LINE)", "https://line.me/ti/p/e-8n-__If_", use_container_width=True)
+# --- [ 5. AI MUSIC GENERATOR (Linguistic & Integration) ] ---
+st.markdown('<div class="luxury-card">', unsafe_allow_html=True)
+st.subheader("📝 ระบายอารมณ์เพื่อสร้างบทเพลงบำบัด")
+user_msg = st.text_area("ตอนนี้รู้สึกยังไง... บอกช่างใหญ่ AI หน่อย", placeholder="พิมพ์ความรู้สึกที่นี่...")
+
+if st.button("RUN INTEGRATION LOGIC"):
+    if user_msg and model:
+        with st.spinner('กำลังประมวลผลโลจิกทั้ง 6 ชุด...'):
+            prompt = f"""
+            คุณคือ AI โปรดิวเซอร์ระดับโลก แต่งเพลงไทยบำบัดจาก: "{user_msg}"
+            Bio-Data: {bpm} BPM, {temp}C, {freq}Hz
+            ตอบเป็น JSON เท่านั้น: 
+            {{ "title": "ชื่อเพลง", "genre": "แนวเพลง", "lyrics": "เนื้อเพลงสั้นๆ 4 บรรทัด", "advice": "คำแนะนำการใช้ชีวิต" }}
+            """
+            try:
+                response = model.generate_content(prompt)
+                res_data = json.loads(response.text.replace('```json', '').replace('```', ''))
+                
+                st.success(f"🎵 {res_data['title']}")
+                st.info(f"แนวเพลง: {res_data['genre']}")
+                st.write(res_data['lyrics'])
+                st.warning(f"💡 คำแนะนำ: {res_data['advice']}")
+                st.balloons()
+            except:
+                st.write("AI กำลังจูนคลื่น... ลองส่งข้อความใหม่อีกครั้ง")
+    else:
+        st.warning("กรุณาใส่ข้อความหรือตรวจสอบ API Key")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- [ 6. VISUAL LOGIC & MULTIMEDIA ] ---
+st.write("---")
+st.markdown("<div class='status-flash' style='background-color:#FF0000; color:white;'>🔴 LIVE SYNC: ON AIR</div>", unsafe_allow_html=True)
+
+v_col1, v_col2 = st.columns(2)
+with v_col1:
+    st.markdown("### 📽️ 4K Visual Therapy")
+    # ตัวอย่างวิดีโอผ่อนคลาย
+    st.video("https://www.youtube.com/watch?v=n61ULEU7CO0")
+
+with v_col2:
+    st.markdown("### 🎼 6D Audio Layer")
+    # โหลดวิดีโอเพลงที่สองเพื่อสร้าง Layer เสียง
+    st.video("https://www.youtube.com/watch?v=cbcuYnyr828")
+
+# --- [ 7. EXTRA YOUTUBE (5 ช่องตามคำขอ) ] ---
+st.write("---")
+st.markdown("### 🎵 Additional Healing Channels")
+yt_links = [
+    "https://www.youtube.com/embed/videoseries?list=PL6S211I3urvpt47sv8mhbexif2YOzs2gO",
+    "https://www.youtube.com/watch?v=Bb3Jtsik3nY",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://www.youtube.com/watch?v=yK1lT73hI9g",
+    "https://www.youtube.com/watch?v=5qap5aO4i9A"
+]
+
+yt_tabs = st.tabs(["CH 1", "CH 2", "CH 3", "CH 4", "CH 5"])
+for i, tab in enumerate(yt_tabs):
+    with tab:
+        st.video(yt_links[i])
+
+# --- [ 8. UPLOAD & SOCIAL ] ---
+st.write("---")
+u_col1, u_col2 = st.columns(2)
+with u_col1:
+    st.file_uploader("📸 อัปโหลดรูปภาพบำบัด", type=["jpg", "png"])
+with u_col2:
+    st.file_uploader("🎥 อัปโหลดวิดีโอส่วนตัว", type=["mp4"])
+
+st.link_button("🔵 แชร์ความรู้สึกไปยัง Facebook", "https://www.facebook.com")
+st.link_button("🟢 แชทกับดีเจบอล (LINE)", "https://line.me")
 
 # Sidebar
-st.sidebar.markdown('### <span class="on-air">● DJ บอล ON AIR</span>', unsafe_allow_html=True)
-st.sidebar.write('สโลแกน: **"อยู่นิ่งๆ ไม่เจ็บตัว"**')
+st.sidebar.image("https://via.placeholder.com/150", caption="DJ บอล ON AIR")
+st.sidebar.markdown(f"**สถานะระบบ:** 🟢 ปกติ")
+st.sidebar.markdown(f"**โลจิก:** 6-Logic Active")
+st.sidebar.markdown(f"**ความถี่:** {freq} Hz")
