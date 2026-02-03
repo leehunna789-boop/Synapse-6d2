@@ -12,7 +12,16 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     # ตั้งชื่อตัวแปรให้ชัดเจน (v1)
+    
     v1 = st.file_uploader("ท่อนที่ 1", type=["wav"], key="v1")
+# 1. ติดตั้ง Angular CLI (ถ้ายังไม่มี)
+npm install -g @angular/cli
+
+# 2. ติดตั้ง Library ที่โค้ดเราเรียกใช้ (Firebase)
+npm install firebase @angular/fire
+
+# 3. สั่งรันแอป
+ng serve --open
 
 with col2:
     v2 = st.file_uploader("ท่อนที่ 2", type=["wav"], key="v2")
