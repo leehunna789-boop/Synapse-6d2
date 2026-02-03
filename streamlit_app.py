@@ -1,25 +1,29 @@
+import streamlit as st
 from pydub import AudioSegment
+import io
 
-def combine_audio(vocal_path, instrumental_path, output_name):
-    # 1. โหลดไฟล์เสียง
-    print("กำลังโหลดไฟล์...")
-    vocal = AudioSegment.from_file(vocal_path)
-    instrumental = AudioSegment.from_file(instrumental_path)
+# ตั้งชื่อหน้าเว็บ
+st.set_page_config(page_title="Audio Mixer", page_icon="🎵")
+st.header("เครื่องมือรวมเสียงร้อง + ดนตรี")
 
-    # 2. ปรับความดัง (ถ้าเสียงร้องเบาไป เพิ่มเลขได้ เช่น +3)
-    # vocal = vocal + 2 
+# ส่วนอัปโหลดไฟล์
+vocal_file = st.file_uploader("1. อัปโหลดไฟล์เสียงร้อง (Vocal)", type=["wav", "mp3"])
+instrument_file = st.file_uploader("2. อัปโหลดไฟล์ดนตรี (Instrument)", type=["wav", "mp3"])
 
-    # 3. รวมเสียง (Overlay)
-    print("กำลังผสมเสียงเข้าด้วยกัน...")
-    combined = instrumental.overlay(vocal)
+if vocal_file and instrument_file:
+    if st.button("เริ่มรวมเสียง"):
+        with st.spinner("รอแป๊บนะ... กำลังผสมเสียงให้ครับ"):
+            # โหลดไฟล์จากที่อัปโหลด
+            vocal = AudioSegment.from_file(vocal_file)
+            inst = AudioSegment.from_file(instrument_file)
 
-    # 4. ส่งออกไฟล์ผลลัพธ์
-    combined.export(output_name, format="wav")
-    print(f"เสร็จเรียบร้อย! ไฟล์ของคุณคือ: {output_name}")
+            # รวมเสียงเข้าด้วยกัน
+            combined = inst.overlay(vocal)
 
-# --- ตั้งค่าตรงนี้ ---
-vocal_file = "เสียงร้อง-11.wav"        # ไฟล์ที่ได้จาก RVC
-instrument_file = "ดนตรี-11.wav"    # ไฟล์ดนตรีเปล่าๆ
-output_file = "เพลงเต็ม_เสร็จสมบูรณ์.wav"
-
-combine_audio(vocal_file, instrument_file, output_file)
+            # สร้างไฟล์สำหรับดาวน์โหลด
+            out = io.BytesIO()
+            combined.export(out, format="wav")
+            
+            st.success("รวมเสร็จแล้ว!")
+            st.audio(out) # เปิดให้ฟังในเว็บได้เลย
+            st.download_button("ดาวน์โหลดเพลงเต็ม", out.getvalue(), "final_song.wav")
