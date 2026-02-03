@@ -1,50 +1,47 @@
 import streamlit as st
 import numpy as np
-import base64
-import json
 import requests
+import json
 
-# --- ตั้งค่าหน้าจอ ---
-st.set_page_config(page_title="Identity Sound Creator", layout="centered")
+# 1. วางส่วนหัว (Imports) ไว้บนสุด
+st.set_page_config(page_title="Identity Sound")
 
-st.title("🎨 Identity Sound Creator")
-st.subheader("สโลแกน: \"อยู่นิ่งๆ ไม่เจ็บตัว\"")
+# 2. วางฟังก์ชันช่วยสร้างเสียงไว้ตรงกลาง
+def generate_audio(params):
+    sr = 44100
+    t = np.linspace(0, 2, int(sr * 2), False)
+    freq = params.get('rbf1_freq', 440)
+    # สร้างคลื่นเสียงแบบง่าย
+    audio = 0.5 * np.sin(2 * np.pi * freq * t)
+    return (audio * 32767).astype(np.int16).tobytes()
 
-# --- ส่วนรับข้อมูล API Key ---
-# แนะนำให้ใช้ st.secrets หรือป้อนผ่านหน้าจอ
-api_key = st.text_input("ป้อน Gemini API Key ของคุณ:", type="password")
+# 3. ส่วน UI หลัก
+st.title("🎵 Identity Sound Creator")
+key = st.text_input("Gemini API Key:", type="password")
+query = st.text_area("อธิบายตัวตนของคุณ:")
 
-# --- ฟังก์ชันสร้างเสียง (Audio Synthesis) ---
-def generate_audio_data(params):
-    # สร้างคลื่นเสียง Sine Wave เบื้องต้นตามพารามิเตอร์ที่ AI ส่งมา
-    duration = 3.0  # วินาที
-    sample_rate = 44100
-    t = np.linspace(0, duration, int(sample_rate * duration), False)
-    
-    freq = params.get('rbf1_freq', 220)
-    gain = params.get('gain', 0.5)
-    
-    # สร้างคลื่นเสียง (พื้นฐาน)
-    audio_signal = gain * np.sin(2 * np.pi * freq * t)
-    
-    # แปลงเป็น 16-bit PCM
-    audio_signal = (audio_signal * 32767).astype(np.int16)
-    return audio_signal.tobytes()
-
-# --- ส่วน UI หลัก ---
-identity_query = st.text_area(
-    "อธิบายตัวตนของคุณที่นี่...", 
-    placeholder="เช่น เป็นคนลึกลับเหมือนท้องฟ้ายามค่ำคืน แต่มีความหนักแน่น...",
-    height=150
-)
-
-if st.button("🪄 วิเคราะห์และสร้างเสียงตัวตน"):
-    if not api_key:
-        st.error("กรุณาใส่ API Key ก่อนครับ")
-    elif not identity_query:
-        st.warning("กรุณาป้อนข้อมูลตัวตนของคุณก่อน")
+if st.button("สร้างเสียง"):
+    if key and query:
+        # --- จุดที่เชื่อมต่อกับ AI ---
+        api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + key
+        prompt = "Analyze: " + query + ". Output JSON: {explanation: string (Thai), rbf_parameters: {gain, rbf1_freq}}"
+        
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        
+        res = requests.post(api_url, json=payload)
+        data = res.json()
+        
+        # ดึงคำตอบมาแสดง
+        text_resp = data['candidates'][0]['content']['parts'][0]['text']
+        result_json = json.loads(text_resp)
+        
+        st.write(result_json['explanation'])
+        
+        # สร้างเสียงและแสดงตัวเล่นเพลง
+        sound = generate_audio(result_json['rbf_parameters'])
+        st.audio(sound, format="audio/wav", sample_rate=44100)
     else:
-        with st.spinner("AI กำลังถอดรหัสคลื่นเสียงจากตัวตนของคุณ..."):
-            try:
-                # ส่งคำขอไปที่ Gemini API
-                url = f"
+        st.error("กรุณากรอกข้อมูลให้ครบ")
