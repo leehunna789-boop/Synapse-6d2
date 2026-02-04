@@ -1,72 +1,81 @@
 import streamlit as st
 import serial
+import serial.tools.list_ports
 import time
 from datetime import datetime
-import pandas as pd # เพิ่ม pandas สำหรับทำกราฟ
+import pandas as pd
 
-st.set_page_config(page_title="ระบบวัดระดับเสียงและความแม่นยำ", layout="wide")
-st.title("🔊 ระบบวัดระดับเสียงและความแม่นยำ")
+st.set_page_config(page_title="ระบบวัดระดับเสียง", layout="wide")
 
-# ใช้ st.cache_resource เพื่อรักษาการเชื่อมต่อ Serial แม้มีการ Refresh หน้าเว็บ
+# --- ฟังก์ชันช่วยเลือกพอร์ต ---
+def list_serial_ports():
+    ports = serial.tools.list_ports.comports()
+    return [port.device for port in ports]
+
 @st.cache_resource
 def get_serial_connection(port, baudrate):
     try:
-        ser = serial.Serial(port, baudrate, timeout=1)
-        st.success(f"เชื่อมต่อ Arduino สำเร็จที่ {port}")
+        # เพิ่ม dsrdtr=True หรือ rtscts=True หาก Arduino บางรุ่นรีเซ็ตตัวเองบ่อย
+        ser = serial.Serial(port, baudrate, timeout=0.1) 
         return ser
     except Exception as e:
-        st.error(f"เชื่อมต่อไม่ได้: [Errno 2] {e}")
-        st.info("คำแนะนำ: ตรวจสอบใน Device Manager ว่า Arduino ใช้ Port อะไร")
         return None
 
-# ตั้งค่าพอร์ตและลองเชื่อมต่อ
-COM_PORT = 'COM3' # ***แก้ไขตรงนี้เป็นพอร์ตที่ถูกต้อง***
-ser = get_serial_connection(COM_PORT, 9600)
+# --- UI Sidebar ---
+st.sidebar.header("⚙️ การตั้งค่าอุปกรณ์")
+available_ports = list_serial_ports()
+selected_port = st.sidebar.selectbox("เลือก Serial Port", available_ports if available_ports else ["ไม่พบอุปกรณ์"])
+baud_rate = st.sidebar.selectbox("Baud Rate", [9600, 115200], index=0)
 
-# สร้างพื้นที่สำหรับแสดงผลและกราฟ
-col1, col2 = st.columns([1, 2])
+run_system = st.sidebar.toggle("เริ่มการทำงานระบบ", value=False)
+
+# --- พื้นที่แสดงผล ---
+st.title("🔊 ระบบวัดระดับเสียงและความแม่นยำ")
+col1, col2 = st.columns([1, 3])
 metric_placeholder = col1.empty()
 chart_placeholder = col2.empty()
 
-# เตรียม DataFrame สำหรับเก็บข้อมูลย้อนหลัง 50 ค่า
+# เตรียม State ข้อมูล
 if 'history_data' not in st.session_state:
     st.session_state.history_data = pd.DataFrame(columns=['Time', 'Level'])
 
-# ปุ่มหยุดการทำงาน (แสดงใน sidebar)
-stop_btn = st.sidebar.button("หยุดการทำงาน")
-
-if ser and ser.is_open:
-    while not stop_btn:
-        try:
-            line = ser.readline().decode('utf-8').strip()
-            
-            if line:
-                # แปลงข้อมูลเป็นตัวเลข (สมมติว่าเป็นระดับเสียง)
-                try:
-                    value = float(line)
-                    current_time = datetime.now().strftime("%H:%M:%S")
-
-                    # อัปเดต Metric
-                    metric_placeholder.metric(label="ระดับเสียงปัจจุบัน (dB)", value=f"{value:.2f}")
-
-                    # อัปเดตข้อมูลและกราฟ
-                    new_row = pd.DataFrame({'Time': [current_time], 'Level': [value]})
-                    st.session_state.history_data = pd.concat([st.session_state.history_data, new_row]).tail(50)
-                    chart_placeholder.line_chart(st.session_state.history_data.set_index('Time'))
-                
-                except ValueError:
-                    st.warning(f"ได้รับข้อมูลที่ไม่ใช่ตัวเลข: {line}")
-            
-            time.sleep(0.05) # หน่วงเวลาเล็กน้อย
-            
-        except serial.SerialException as e:
-            st.error(f"การเชื่อมต่อขาดหาย: {e}")
-            break # ออกจาก while loop หากเกิดปัญหาการสื่อสาร
+# --- ส่วนการทำงานหลัก ---
+if run_system and selected_port != "ไม่พบอุปกรณ์":
+    ser = get_serial_connection(selected_port, baud_rate)
     
-    # ปิดการเชื่อมต่อเมื่อกดปุ่มหยุด
-    if stop_btn:
-        ser.close()
-        st.sidebar.warning("หยุดการทำงานแล้ว")
-else:
-    st.markdown(f"**ไม่พบอุปกรณ์ Arduino ที่พอร์ต {COM_PORT}**")
+    if ser:
+        try:
+            # ใช้ st.empty() เพื่อสร้างพื้นที่สำหรับปุ่มหยุด (ถ้าต้องการหยุดจากหน้าหลัก)
+            while run_system:
+                if ser.in_waiting > 0:
+                    line = ser.readline().decode('utf-8', errors='ignore').strip()
+                    
+                    try:
+                        value = float(line)
+                        current_time = datetime.now().strftime("%H:%M:%S")
 
+                        # อัปเดต Metric
+                        metric_placeholder.metric(label="ระดับเสียงปัจจุบัน (dB)", value=f"{value:.2f}")
+
+                        # อัปเดตข้อมูล (รักษาไว้แค่ 50 ค่าล่าสุด)
+                        new_data = pd.DataFrame({'Time': [current_time], 'Level': [value]})
+                        st.session_state.history_data = pd.concat([st.session_state.history_data, new_data], ignore_index=True).tail(50)
+                        
+                        # แสดงกราฟ
+                        chart_placeholder.line_chart(st.session_state.history_data.set_index('Time'))
+                        
+                    except ValueError:
+                        pass # ข้ามบรรทัดที่ข้อมูลไม่สมบูรณ์เพื่อไม่ให้ระบบ "เจ็บตัว"
+                
+                time.sleep(0.1) # ปรับความเร็วให้เหมาะสม ไม่ให้ CPU ทำงานหนักเกินไป
+                
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาด: {e}")
+            st.session_state.history_data = pd.DataFrame(columns=['Time', 'Level']) # ล้างข้อมูลเก่ากรณีหลุด
+    else:
+        st.error("ไม่สามารถเปิดการเชื่อมต่อได้ ตรวจสอบว่ามีโปรแกรมอื่นใช้พอร์ตนี้อยู่หรือไม่")
+else:
+    st.info("กรุณาเลือกพอร์ตและกด 'เริ่มการทำงานระบบ' ที่แถบด้านซ้าย")
+    # ปิดการเชื่อมต่อเมื่อ Toggle เป็น False
+    if 'ser' in locals() and ser:
+        ser.close()
