@@ -12,3 +12,5 @@ praat-parselmouth
 firebase-admin
 requests
 streamlit-player
+pyserial
+pandas
