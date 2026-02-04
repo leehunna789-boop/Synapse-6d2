@@ -1,63 +1,72 @@
 import streamlit as st
 import serial
-import pandas as pd
 import time
 from datetime import datetime
+import pandas as pd # เพิ่ม pandas สำหรับทำกราฟ
 
-st.set_page_config(page_title="Sound Level Monitor", layout="wide")
+st.set_page_config(page_title="ระบบวัดระดับเสียงและความแม่นยำ", layout="wide")
 st.title("🔊 ระบบวัดระดับเสียงและความแม่นยำ")
 
-# ใช้ st.cache_resource เพื่อให้เชื่อมต่อ Serial ค้างไว้แม้จะ Refresh หน้าจอ
+# ใช้ st.cache_resource เพื่อรักษาการเชื่อมต่อ Serial แม้มีการ Refresh หน้าเว็บ
 @st.cache_resource
 def get_serial_connection(port, baudrate):
     try:
-        return serial.Serial(port, baudrate, timeout=0.1)
+        ser = serial.Serial(port, baudrate, timeout=1)
+        st.success(f"เชื่อมต่อ Arduino สำเร็จที่ {port}")
+        return ser
     except Exception as e:
-        st.error(f"เชื่อมต่อไม่ได้: {e}")
+        st.error(f"เชื่อมต่อไม่ได้: [Errno 2] {e}")
+        st.info("คำแนะนำ: ตรวจสอบใน Device Manager ว่า Arduino ใช้ Port อะไร")
         return None
 
-ser = get_serial_connection('COM3', 9600)
+# ตั้งค่าพอร์ตและลองเชื่อมต่อ
+COM_PORT = 'COM3' # ***แก้ไขตรงนี้เป็นพอร์ตที่ถูกต้อง***
+ser = get_serial_connection(COM_PORT, 9600)
 
-# สร้างพื้นที่สำหรับแสดงผล
-col1, col2 = st.columns([1, 3])
-with col1:
-    metric_placeholder = st.empty()
-with col2:
-    chart_placeholder = st.empty()
+# สร้างพื้นที่สำหรับแสดงผลและกราฟ
+col1, col2 = st.columns([1, 2])
+metric_placeholder = col1.empty()
+chart_placeholder = col2.empty()
 
-# เก็บข้อมูลสำหรับทำกราฟ
-if 'history' not in st.session_state:
-    st.session_state.history = pd.DataFrame(columns=['Time', 'Level'])
+# เตรียม DataFrame สำหรับเก็บข้อมูลย้อนหลัง 50 ค่า
+if 'history_data' not in st.session_state:
+    st.session_state.history_data = pd.DataFrame(columns=['Time', 'Level'])
+
+# ปุ่มหยุดการทำงาน (แสดงใน sidebar)
+stop_btn = st.sidebar.button("หยุดการทำงาน")
 
 if ser and ser.is_open:
-    st.sidebar.success("สถานะ: เชื่อมต่อแล้ว")
-    
-    # ปุ่มหยุดการทำงาน
-    stop_btn = st.sidebar.button("หยุดการทำงาน")
-    
     while not stop_btn:
-        line = ser.readline().decode('utf-8').strip()
-        
-        if line:
-            try:
-                # แปลงค่าที่รับมาเป็นตัวเลข (สมมติว่าเป็นค่าระดับเสียง)
-                value = float(line)
-                now = datetime.now().strftime("%H:%M:%S")
+        try:
+            line = ser.readline().decode('utf-8').strip()
+            
+            if line:
+                # แปลงข้อมูลเป็นตัวเลข (สมมติว่าเป็นระดับเสียง)
+                try:
+                    value = float(line)
+                    current_time = datetime.now().strftime("%H:%M:%S")
+
+                    # อัปเดต Metric
+                    metric_placeholder.metric(label="ระดับเสียงปัจจุบัน (dB)", value=f"{value:.2f}")
+
+                    # อัปเดตข้อมูลและกราฟ
+                    new_row = pd.DataFrame({'Time': [current_time], 'Level': [value]})
+                    st.session_state.history_data = pd.concat([st.session_state.history_data, new_row]).tail(50)
+                    chart_placeholder.line_chart(st.session_state.history_data.set_index('Time'))
                 
-                # อัปเดต Metric
-                metric_placeholder.metric(label="ระดับเสียงปัจจุบัน", value=f"{value} dB")
-                
-                # อัปเดต Data สำหรับกราฟ (เก็บ 50 ค่าล่าสุด)
-                new_data = pd.DataFrame({'Time': [now], 'Level': [value]})
-                st.session_state.history = pd.concat([st.session_state.history, new_data]).tail(50)
-                
-                # แสดงกราฟ
-                chart_placeholder.line_chart(st.session_state.history.set_index('Time'))
-                
-            except ValueError:
-                st.warning(f"ข้อมูลผิดพลาด: {line}")
-        
-        time.sleep(0.05) # ปรับค่าให้เหมาะสมกับความเร็วการส่งข้อมูลจาก Arduino
+                except ValueError:
+                    st.warning(f"ได้รับข้อมูลที่ไม่ใช่ตัวเลข: {line}")
+            
+            time.sleep(0.05) # หน่วงเวลาเล็กน้อย
+            
+        except serial.SerialException as e:
+            st.error(f"การเชื่อมต่อขาดหาย: {e}")
+            break # ออกจาก while loop หากเกิดปัญหาการสื่อสาร
+    
+    # ปิดการเชื่อมต่อเมื่อกดปุ่มหยุด
+    if stop_btn:
+        ser.close()
+        st.sidebar.warning("หยุดการทำงานแล้ว")
 else:
-    st.error("กรุณาตรวจสอบการเชื่อมต่อ Arduino ที่ COM3")
-    st.info("คำแนะนำ: ตรวจสอบใน Device Manager ว่า Arduino ใช้ Port อะไร")
+    st.markdown(f"**ไม่พบอุปกรณ์ Arduino ที่พอร์ต {COM_PORT}**")
+
